@@ -34,9 +34,9 @@ The `$id` URLs are identifiers, not promised to be fetchable. Examples: [`exampl
 | `specversion` | yes | `"1.0"`. |
 | `type` | yes | One of the three types above. The short type is `type` without the `dev.angelia.` prefix and the `.v<major>` suffix; subscription filters use it. |
 | `source` | yes | `angelia://<instance>/watches/<watch_id>`, for example `angelia://angelia/watches/01JBX1Z3M4N5P6Q7R8S9T0V1W2`. `<instance>` is the instance name from the instance configuration (pattern `^[a-z0-9][a-z0-9.-]{0,62}$`, default `angelia`); `<watch_id>` equals `data.watch.id`. Two watches on one package produce two events with different `source` values. |
-| `id` | yes | ULID: 26 characters, Crockford base32, upper case. Generated once when the event is written. Every delivery attempt, retry and replay carries the same `id`: deduplicate on it (delivery is at-least-once). `source` + `id` is globally unique. The `id` is not derived from content: to get one notification per release across two watches, deduplicate on `data.purl` + `type` or `subject` + `type`. |
+| `id` | yes | ULID: 26 characters, Crockford base32, upper case. Generated once when the event is written. Every delivery attempt, retry and replay carries the same `id`: deduplicate on it (delivery is at-least-once). `source` + `id` is globally unique. The `id` is not derived from content: to get one notification per release across two watches, deduplicate on `data.purl` + `type` or `subject` + `type`. Example: `01JBX2A7C8D9E0F1G2H3J4K5M6`. |
 | `subject` | yes | `<source kind>:<package>@<version>` with the raw version, for example `pypi:requests@2.33.0`, `npm:@angular/core@17.3.0`, `github-release:cli/cli@v2.62.0`. |
-| `time` | yes | When the event was **emitted** (the end of the check that emitted it). With a cooldown this is later than `data.detected_at`. |
+| `time` | yes | When the event was **emitted** (the end of the check that emitted it). With a cooldown this is later than `data.detected_at`. Same format as the `data` timestamps, for example `2026-10-30T17:00:02.512Z`. |
 | `datacontenttype` | yes | `"application/json"`. |
 | `dataschema` | yes | `"https://github.com/angelia-dev/spec/schemas/release/v1.json"`. Once the spec repository has release tags it will name a tagged, versioned URL instead. |
 | `data` | yes | The payload described below. |
@@ -70,7 +70,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `package`
 
 - **Type:** string. **Required, not null.**
-- Package name as the source normalised it. The form depends on the source kind: `requests` (pypi), `@angular/core` (npm), `serde` (crates), `cli/cli` (GitHub owner/repo), `group/subgroup/project` (GitLab path), `ghcr.io/org/image` (OCI), `github.com/gorilla/mux` (Go module path), `org.slf4j:slf4j-api` (Maven). The subscription filter's `package` glob matches it.
+- Package name as the source normalised it; never blank (it contains at least one non-whitespace character). The form depends on the source kind: `requests` (pypi), `@angular/core` (npm), `serde` (crates), `cli/cli` (GitHub owner/repo), `group/subgroup/project` (GitLab path), `ghcr.io/org/image` (OCI), `github.com/gorilla/mux` (Go module path), `org.slf4j:slf4j-api` (Maven). The subscription filter's `package` glob matches it.
 - Example: `"requests"`
 
 ### `version`
@@ -212,7 +212,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `watch.labels`
 
 - **Type:** object of string to string. **Required, not null.**
-- The watch's labels; `{}` when it has none, never `null`. At most 32 entries; keys match `^[A-Za-z0-9][A-Za-z0-9._/-]{0,62}$`; values are at most 253 characters. The subscription filter's `labels` key matches them.
+- The watch's labels; `{}` when it has none, never `null`. At most 32 entries; keys match `^[A-Za-z0-9][A-Za-z0-9._/-]{0,62}$`; values are at most 253 characters and contain no control characters (U+0000 to U+001F, U+007F). The subscription filter's `labels` key matches them.
 - Example: `{"team": "platform", "repo": "api"}`
 
 ### `purl`

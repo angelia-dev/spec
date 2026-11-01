@@ -31,9 +31,10 @@
       "examples": ["pypi"]
     },
     "package": {
-      "description": "Package name as the source normalised it. Its form depends on the source kind: `requests` (pypi), `@angular/core` (npm), `cli/cli` (GitHub owner/repo), `group/subgroup/project` (GitLab path), `ghcr.io/org/image` (OCI), `github.com/gorilla/mux` (Go module path), `org.slf4j:slf4j-api` (Maven).",
+      "description": "Package name as the source normalised it; never blank. Its form depends on the source kind: `requests` (pypi), `@angular/core` (npm), `cli/cli` (GitHub owner/repo), `group/subgroup/project` (GitLab path), `ghcr.io/org/image` (OCI), `github.com/gorilla/mux` (Go module path), `org.slf4j:slf4j-api` (Maven).",
       "type": "string",
       "minLength": 1,
+      "pattern": "\\S",
       "examples": ["requests"]
     },
     "version": {
@@ -156,7 +157,7 @@
           "examples": ["requests"]
         },
         "labels": {
-          "description": "The watch's labels, an object of string to string; {} when it has none, never null. At most 32 entries; values at most 253 characters.",
+          "description": "The watch's labels, an object of string to string; {} when it has none, never null. At most 32 entries; values at most 253 characters, without control characters (U+0000 to U+001F, U+007F).",
           "type": "object",
           "maxProperties": 32,
           "propertyNames": {
@@ -164,7 +165,8 @@
           },
           "additionalProperties": {
             "type": "string",
-            "maxLength": 253
+            "maxLength": 253,
+            "pattern": "^[^\\u0000-\\u001F\\u007F]*$"
           },
           "examples": [{ "team": "platform", "repo": "api" }]
         }
