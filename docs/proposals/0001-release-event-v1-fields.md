@@ -1,6 +1,7 @@
 # Proposal 0001: release event v1, envelope profile and field names
 
-- **Status:** Proposed (draft for maintainer review; nothing here is a contract yet)
+- **Status:** Accepted (maintainer, 2026-11-01, PR #6)
+- **Decision:** the recommendation of every open question in section 7 is adopted as written. Implemented in `schemas/release/v1.json`, `schemas/release/envelope/v1.json` and `docs/release-event-v1.md`.
 - **Date:** 2026-11-01
 - **Story:** angelia-dev/spec#2 (Human-led)
 - **Sources read:** core repository `main` at `660363a`: architecture.md §3.3 to §5, prd.md, ADR 0004, 0006, 0010, 0012, `docs/watch-file.md`, `internal/version`, `internal/policy` (`Release`), `internal/diff` (`Change`), `internal/subscription` (`Input`, `Filter`), `internal/source` (`Version`, source kinds)
