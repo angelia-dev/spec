@@ -13,8 +13,17 @@ Part of [Angelia](https://github.com/angelia-dev), the self-hosted release event
 - `examples/invalid/<type>/v<major>/`: examples that must fail validation against their schema.
 - `openapi/`: OpenAPI specification (not yet populated).
 - `scripts/validate-examples.sh`: validates every example and every schema. CI runs it on each pull request and push to `main`.
+- `docs/`: per-field documentation and accepted proposals.
 
-`schemas/placeholder/v0.json` is a PLACEHOLDER that only proves the pipeline. It is not an Angelia contract.
+When several event types carry the same payload, they share one schema: the three release types `dev.angelia.release.published.v1`, `dev.angelia.release.yanked.v1` and `dev.angelia.release.prerelease.v1` all use `schemas/release/v1.json` for `data`, and `schemas/release/envelope/v1.json` profiles their CloudEvents envelope.
+
+## Event types
+
+| Type | `data` schema | Envelope schema | Docs |
+| --- | --- | --- | --- |
+| `dev.angelia.release.published.v1`, `dev.angelia.release.yanked.v1`, `dev.angelia.release.prerelease.v1` | [`schemas/release/v1.json`](schemas/release/v1.json) | [`schemas/release/envelope/v1.json`](schemas/release/envelope/v1.json) | [docs/release-event-v1.md](docs/release-event-v1.md) |
+
+All three are **drafts** (see [Versioning](#versioning)).
 
 Validate locally:
 
@@ -25,12 +34,38 @@ scripts/validate-examples.sh
 
 ## Versioning
 
+**While the spec repository is at version 0.x, every schema here is a draft: it may still change, including in a breaking way, in any 0.x minor release before spec 1.0, without a new `.v<major>` type.** Breaking changes are listed in the release notes. The `v<major>` suffix names the major version that is frozen at spec 1.0.0; the rules below apply from then on.
+
 Each event type is named `dev.angelia.<type>.v<major>`, and its schema lives at `schemas/<type>/v<major>.json`. The versioning follows SemVer:
 
 - **Additive change** (for example a new optional field): minor version bump. The existing `v<major>` schema is extended.
+
+Producers emit only the documented fields and, in v1, no CloudEvents extension attributes. Consumers **must ignore** unknown fields and extension attributes: the schemas accept them (in the envelope, any name matching the CloudEvents extension naming rule `^[a-z0-9]{1,20}$`), so that adding an optional field stays a minor change.
 - **Breaking change** (removing or renaming a field, changing a type, making an optional field required, or changing an enum): major version bump. A new `dev.angelia.<type>.v<major+1>` schema is added, and the change needs an ADR in the core [angelia](https://github.com/angelia-dev/angelia) repository.
 
 Published `v<major>` schemas are not edited in a breaking way.
+
+## Open questions
+
+[Proposal 0001](docs/proposals/0001-release-event-v1-fields.md) was accepted with its recommendation for every question. What is still open or provisional for the release events before spec 1.0:
+
+- **`notes.body` size limit.** Set at 16,384 bytes of UTF-8. No source fills `notes` yet, so the notes enrichment story (PRD F12) may revise the limit; the fields `notes.body` and `notes.truncated` stay. JSON Schema can only check a character count, so the byte limit is enforced by producers.
+- **`watch.labels` shape.** An object of string to string, as in the watch file and the subscription filter. To be revisited only if array-based consumers (SQL, BI tools) prove it necessary before 1.0.
+- **`dataschema` and `$id` URLs.** Today `https://github.com/angelia-dev/spec/schemas/...`, an identifier that is not fetchable as JSON. Once the repository has release tags, `dataschema` names a tagged, versioned URL; whether to move to a domain the project owns is undecided.
+- **Cooldown basis.** The rule for when a cooldown starts (`published_at` or `detected_at`, core ADR 0012 §6) is still pending in the core repository; it changes the value of `cooldown_satisfied_at`, not the schema. A field exposing the basis may be added later as an optional field.
+- **OCI purl.** Until the `oci` source reports manifest digests, its `purl` is versionless with a `tag` qualifier.
+- **GitLab purl.** A watch whose project is a numeric id has `purl: null` unless the source reports the project path.
+- **Later additive changes.** The `partitionkey` extension attribute (with the NATS, MQTT and Kafka sinks), a `release.unyanked` type, and a `release.advisory` type (PRD F15) are not in v1.
+- **Subscription filter on `bump: prerelease`.** The filter accepts only `major`, `minor`, `patch`; whether it should also accept `prerelease` is a watch-file question for the core repository.
+
+### Follow-ups in the core repo
+
+The accepted proposal changes things outside this repository. Each needs an issue in [angelia](https://github.com/angelia-dev/angelia):
+
+- **`instance.name` config key** (proposal Q3): a new instance configuration key, default `angelia`, pattern `^[a-z0-9][a-z0-9.-]{0,62}$`, used as `<instance>` in the envelope `source`.
+- **architecture.md §4 update**: rename `ecosystem` to `source`; the watch id is a bare ULID (not `w_123`) and the envelope `source` is `angelia://<instance>/watches/<watch_id>`; `time` is the emission time, not `detected_at`; add the new fields `normalized_version`, `backport` and `watch.name`.
+- **Emission rules for angelia-dev/angelia#106**: when each type is emitted, every field always present (`null`, never omitted), no extension attributes, and the purl built per source kind as [docs/release-event-v1.md](docs/release-event-v1.md) describes (for `pypi`, from the project name as PyPI reports it, not the PEP 503 form).
+- **Yank rules for angelia-dev/angelia#112**: `release.yanked` only for versions the watch has emitted, one event per watch per yank, repeating the stored classification with `cooldown_satisfied_at: null` and `detected_at` set to when the yank was seen; no un-yank event in v1.
 
 ## Licensing
 
