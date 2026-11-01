@@ -1,10 +1,18 @@
-# markdownlint-cli2 configuration. Rules disabled below are deliberate:
+# markdownlint-cli2 configuration. The rules disabled or relaxed below are
+# deliberate; each comment names the files that need the exception.
+ignores:
+  - "node_modules/**"
 config:
   # Prose is written one paragraph per line, not hard-wrapped.
   MD013: false
-  # CLAUDE.md is a one-line import of AGENTS.md, and the PR template opens
-  # with a "Closes #<issue>" placeholder rather than a heading.
+  # Existing files that do not start with a top-level heading:
+  #   CLAUDE.md (one-line import of AGENTS.md)
+  #   .github/pull_request_template.md (starts with "Closes #<issue>")
   MD041: false
-  # The PR template uses an <issue> placeholder, which is not real HTML.
+  # Allowed element only for the placeholder in .github/pull_request_template.md.
   MD033:
     allowed_elements: ["issue"]
+  # AGENTS.md has a list and a heading with no blank line between them, and
+  # the agent guide is owned by the core repository, so it is not edited here.
+  MD022: false
+  MD032: false

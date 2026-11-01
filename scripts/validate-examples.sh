@@ -2,12 +2,18 @@
 # Validates every example against the schema selected by its path.
 #
 # Path convention:
-#   examples/valid/<type>/v<major>/<name>.json   must pass
-#   examples/invalid/<type>/v<major>/<name>.json must fail
+#   examples/valid/<type>/v<major>/<name>.json   must validate
+#   examples/invalid/<type>/v<major>/<name>.json must fail schema validation
 #   maps to schemas/<type>/v<major>.json
 #
-# Fails if a valid example fails, an invalid example passes, an example has
-# no matching schema, or no examples were found at all.
+# Fails if:
+#   - a valid example fails, or an invalid example passes;
+#   - an invalid example fails for the wrong reason (malformed JSON,
+#     unresolvable $ref, unexpected tool error): only the schema-validation
+#     error message counts as a correct failure;
+#   - an example is not parseable JSON, or is not a .json file;
+#   - an example has no matching schema, or a schema is not valid JSON Schema;
+#   - no examples were found at all.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -18,21 +24,34 @@ if ! command -v "$CHECK" >/dev/null 2>&1; then
   exit 2
 fi
 
+# Message printed by check-jsonschema 0.38.2 when an instance violates its schema.
+VALIDATION_ERROR="Schema validation errors were encountered."
+
 failures=0
 checked=0
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 
-# 1. Every schema must itself be a valid JSON Schema.
+fail() {
+  echo "FAIL $*"
+  failures=$((failures + 1))
+}
+
+# 1. Examples must be .json files only.
+while IFS= read -r -d '' other; do
+  fail "non-JSON file under examples/: $other"
+done < <(find examples -type f ! -name '*.json' -print0)
+
+# 2. Every schema must itself be a valid JSON Schema.
 while IFS= read -r -d '' schema; do
-  if ! "$CHECK" --check-metaschema "$schema" >/dev/null 2>&1; then
-    echo "FAIL metaschema: $schema is not a valid JSON Schema"
-    "$CHECK" --check-metaschema "$schema" || true
-    failures=$((failures + 1))
+  if ! "$CHECK" --check-metaschema "$schema" >"$log" 2>&1; then
+    fail "metaschema: $schema is not a valid JSON Schema"
+    cat "$log"
   fi
 done < <(find schemas -type f -name '*.json' -print0)
 
-# 2. Examples must match their schema (valid passes, invalid fails).
+# 3. Examples must match their schema: valid passes, invalid fails with a
+#    schema-validation error (and nothing else).
 check_group() {
   local group="$1" expect="$2" # expect: pass | fail
   local root="examples/$group"
@@ -40,36 +59,39 @@ check_group() {
   while IFS= read -r -d '' example; do
     found=$((found + 1))
     local rel="${example#"$root"/}"          # <type>/v<major>/<name>.json
-    local dir rel_schema schema
+    local dir
     dir="$(dirname "$rel")"                  # <type>/v<major>
     if [[ "$dir" == "." || "$(basename "$dir")" != v[0-9]* ]]; then
-      echo "FAIL layout: $example must be $root/<type>/v<major>/<name>.json"
-      failures=$((failures + 1))
+      fail "layout: $example must be $root/<type>/v<major>/<name>.json"
       continue
     fi
-    schema="schemas/${dir}.json"
+    local schema="schemas/${dir}.json"
     if [[ ! -f "$schema" ]]; then
-      echo "FAIL schema: no schema $schema for $example"
-      failures=$((failures + 1))
+      fail "schema: no schema $schema for $example"
+      continue
+    fi
+    if ! python3 -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$example" 2>"$log"; then
+      fail "parse: $example is not valid JSON"
+      cat "$log"
       continue
     fi
     checked=$((checked + 1))
-    if "$CHECK" --schemafile "$schema" "$example" >"$log" 2>&1; then
-      result=pass
-    else
+    local result=pass
+    if ! "$CHECK" --schemafile "$schema" "$example" >"$log" 2>&1; then
       result=fail
     fi
-    if [[ "$result" == "$expect" ]]; then
-      echo "ok   [$group expects $expect] $example"
-    else
-      echo "FAIL [$group expects $expect, got $result] $example against $schema"
+    if [[ "$result" != "$expect" ]]; then
+      fail "[$group expects $expect, got $result] $example against $schema"
       cat "$log"
-      failures=$((failures + 1))
+    elif [[ "$expect" == fail ]] && ! grep -qF "$VALIDATION_ERROR" "$log"; then
+      fail "[$group] $example failed for the wrong reason (no schema-validation error)"
+      cat "$log"
+    else
+      echo "ok   [$group expects $expect] $example"
     fi
   done < <(find "$root" -type f -name '*.json' -print0)
   if [[ "$found" -eq 0 ]]; then
-    echo "FAIL: no examples found under $root"
-    failures=$((failures + 1))
+    fail "no examples found under $root"
   fi
 }
 
