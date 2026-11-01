@@ -1,0 +1,10 @@
+# markdownlint-cli2 configuration. Rules disabled below are deliberate:
+config:
+  # Prose is written one paragraph per line, not hard-wrapped.
+  MD013: false
+  # CLAUDE.md is a one-line import of AGENTS.md, and the PR template opens
+  # with a "Closes #<issue>" placeholder rather than a heading.
+  MD041: false
+  # The PR template uses an <issue> placeholder, which is not real HTML.
+  MD033:
+    allowed_elements: ["issue"]

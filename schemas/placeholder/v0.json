@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/angelia-dev/spec/schemas/placeholder/v0.json",
+  "title": "PLACEHOLDER - not a real Angelia contract",
+  "description": "PLACEHOLDER schema used only to prove the validation pipeline. It is NOT an Angelia event type and must be replaced by a real schema (dev.angelia.<type>.v<major>) before any contract is published.",
+  "$comment": "PLACEHOLDER. Do not reuse these fields for real events.",
+  "type": "object",
+  "required": ["placeholder"],
+  "properties": {
+    "placeholder": {
+      "const": true
+    }
+  },
+  "additionalProperties": false
+}
