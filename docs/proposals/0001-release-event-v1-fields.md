@@ -237,7 +237,7 @@ These are flagged, not resolved; each maps to a question above.
 
 ## 10. Amendments after acceptance
 
-Review of the schemas on angelia-dev/spec#2 (2026-11-01) changed the following. Each item is pending the maintainer's confirmation.
+Review of the schemas on angelia-dev/spec#2 (2026-11-01) changed the following. Open objects were confirmed by the maintainer (2026-11-01); the purl items are pending confirmation.
 
 - **Open objects.** The `data` object and its nested `urls`, `notes` and `watch` objects accept unknown properties, and the envelope accepts CloudEvents extension attributes (names matching `^[a-z0-9]{1,20}$`; other unknown names stay rejected). Producers still emit only the documented fields and, as Q5 decided, no extension attributes in v1; consumers must ignore unknown fields and extension attributes. This keeps a new optional field a minor change, as section 6 says, instead of breaking every consumer that validates strictly. The alternative, closed objects (`additionalProperties: false`), was the first draft of the schemas.
 - **`purl` row of section 3.** Q16's answer supersedes the row's first wording: an OCI image without a known digest gets a versionless purl with a `tag` qualifier, not `null`.
