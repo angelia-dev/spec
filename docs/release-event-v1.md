@@ -25,7 +25,7 @@ The `$id` URLs are identifiers, not promised to be fetchable. Examples: [`exampl
 - **Every documented field is always present.** A field with no value is `null`, never omitted. Fields added later in a minor version are optional and may be absent in older events.
 - Timestamps are RFC 3339 in UTC with a `Z` suffix and at most millisecond precision, for example `2026-10-30T17:00:02.512Z`.
 - **Open sets.** The values of `source`, `scheme` and `notes.format` are documented lists, not closed enums: they match `^[a-z0-9][a-z0-9-]{0,62}$`, and consumers must accept values they do not know. `bump` and the event `type` are closed enums.
-- No property other than the documented ones is allowed, in the envelope, in `data` or in its nested objects (`watch.labels` excepted, which is a map).
+- **Open objects, tolerant consumers.** Producers emit only the documented fields in `data` and its nested objects, and only the documented envelope attributes (no extension attributes in v1). Consumers **must ignore** fields and extension attributes they do not know: the `data` schema and its nested objects (`urls`, `notes`, `watch`) accept unknown properties, and the envelope schema accepts any attribute whose name is a valid CloudEvents extension name (`^[a-z0-9]{1,20}$`, for example `traceparent` added by a tracing intermediary). Other unknown envelope names are rejected. Adding a new optional field or attribute is therefore a **minor** change.
 
 ## Envelope attributes
 
@@ -41,7 +41,7 @@ The `$id` URLs are identifiers, not promised to be fetchable. Examples: [`exampl
 | `dataschema` | yes | `"https://github.com/angelia-dev/spec/schemas/release/v1.json"`. Once the spec repository has release tags it will name a tagged, versioned URL instead. |
 | `data` | yes | The payload described below. |
 
-v1 defines **no extension attributes**. `partitionkey` (the CloudEvents Partitioning extension) is planned with the NATS, MQTT and Kafka sinks, as an additive change.
+v1 defines **no extension attributes**, and Angelia emits none. Consumers must ignore extension attributes they find anyway (a broker or tracing intermediary may add `traceparent`, for example); the envelope schema allows any name matching `^[a-z0-9]{1,20}$`. `partitionkey` (the CloudEvents Partitioning extension) is planned with the NATS, MQTT and Kafka sinks, as an additive change.
 
 The per-delivery `idempotency-key` and the Standard Webhooks `webhook-id` are delivery headers, not CloudEvents attributes.
 

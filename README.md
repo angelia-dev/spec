@@ -39,6 +39,8 @@ scripts/validate-examples.sh
 Each event type is named `dev.angelia.<type>.v<major>`, and its schema lives at `schemas/<type>/v<major>.json`. The versioning follows SemVer:
 
 - **Additive change** (for example a new optional field): minor version bump. The existing `v<major>` schema is extended.
+
+Producers emit only the documented fields and, in v1, no CloudEvents extension attributes. Consumers **must ignore** unknown fields and extension attributes: the schemas accept them (in the envelope, any name matching the CloudEvents extension naming rule `^[a-z0-9]{1,20}$`), so that adding an optional field stays a minor change.
 - **Breaking change** (removing or renaming a field, changing a type, making an optional field required, or changing an enum): major version bump. A new `dev.angelia.<type>.v<major+1>` schema is added, and the change needs an ADR in the core [angelia](https://github.com/angelia-dev/angelia) repository.
 
 Published `v<major>` schemas are not edited in a breaking way.

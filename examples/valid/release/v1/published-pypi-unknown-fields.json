@@ -15,7 +15,8 @@
   "urls": {
     "release": "https://pypi.org/project/requests/2.33.0/",
     "changelog": "https://github.com/psf/requests/blob/main/HISTORY.md",
-    "artifact": null
+    "artifact": null,
+    "homepage": "https://requests.readthedocs.io/"
   },
   "notes": null,
   "watch": {
@@ -27,5 +28,5 @@
     }
   },
   "purl": "pkg:pypi/requests@2.33.0",
-  "ecosystem": "pypi"
+  "cooldown_started_from": "published_at"
 }

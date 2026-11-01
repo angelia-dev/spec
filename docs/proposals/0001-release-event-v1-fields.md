@@ -234,3 +234,9 @@ These are flagged, not resolved; each maps to a question above.
 2. Write `schemas/release/v1.json` and examples for pypi, npm, github-release, a yanked and a pre-release event, plus invalid examples (missing required field, wrong type, bad `bump`), validated by CI.
 3. Write the per-field docs page and the open-questions list in the README, as the issue's acceptance criteria require.
 4. File core issues for what the answers change outside this repository: architecture.md §4, the instance name config key (Q3), and the emission rules for #106 and #112.
+
+## 10. Amendments after acceptance
+
+Review of the schemas on angelia-dev/spec#2 (2026-11-01) changed the following. Each item is pending the maintainer's confirmation.
+
+- **Open objects.** The `data` object and its nested `urls`, `notes` and `watch` objects accept unknown properties, and the envelope accepts CloudEvents extension attributes (names matching `^[a-z0-9]{1,20}$`; other unknown names stay rejected). Producers still emit only the documented fields and, as Q5 decided, no extension attributes in v1; consumers must ignore unknown fields and extension attributes. This keeps a new optional field a minor change, as section 6 says, instead of breaking every consumer that validates strictly. The alternative, closed objects (`additionalProperties: false`), was the first draft of the schemas.
