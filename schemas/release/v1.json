@@ -195,12 +195,12 @@
       "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
     },
     "urlOrNull": {
-      "description": "An absolute https URL (an http URL from a private registry is passed as given), or null when unknown.",
+      "description": "An absolute https URL (an http URL from a private registry is passed as given) with a non-empty host and no whitespace, or null when unknown.",
       "anyOf": [
         {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://"
+          "pattern": "^https?://[^\\s/?#]+([/?#]\\S*)?$"
         },
         { "type": "null" }
       ]

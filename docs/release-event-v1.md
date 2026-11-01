@@ -149,7 +149,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `urls`
 
 - **Type:** object. **Required, not null.** Its three keys are always present.
-- Links about the release. Each URL is `https`; an `http` URL from a private registry is passed as given.
+- Links about the release. Each URL is `https`; an `http` URL from a private registry is passed as given. A URL is absolute, has a non-empty host and contains no whitespace (pattern `^https?://[^\s/?#]+([/?#]\S*)?$`).
 
 ### `urls.release`
 
