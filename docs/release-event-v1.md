@@ -200,7 +200,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `watch.id`
 
 - **Type:** string (ULID). **Required, not null.**
-- Watch id, a bare ULID as the store generates it, the same string as in the API and logs. Stable across edits of the watch; a recreated watch gets a new id. Equals the last segment of the envelope `source`.
+- Watch id, a bare ULID as the store generates it, the same string as in the API and logs. Stable across edits of the watch (including a change of source or coordinates); a renamed or recreated watch gets a new id. Equals the last segment of the envelope `source`.
 - Example: `"01JBX1Z3M4N5P6Q7R8S9T0V1W2"`
 
 ### `watch.name`

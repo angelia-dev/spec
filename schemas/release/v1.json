@@ -145,7 +145,7 @@
       "required": ["id", "name", "labels"],
       "properties": {
         "id": {
-          "description": "Watch id: a ULID, as the store generates it. Stable across edits of the watch; a recreated watch gets a new id.",
+          "description": "Watch id: a ULID, as the store generates it. Stable across edits of the watch (including a change of source or coordinates); a renamed or recreated watch gets a new id.",
           "$ref": "#/$defs/ulid",
           "examples": ["01JBX1Z3M4N5P6Q7R8S9T0V1W2"]
         },
