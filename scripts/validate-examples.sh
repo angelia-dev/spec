@@ -5,6 +5,7 @@
 #   examples/valid/<type>/v<major>/<name>.json   must validate
 #   examples/invalid/<type>/v<major>/<name>.json must fail schema validation
 #   maps to schemas/<type>/v<major>.json
+#   (<type> may have several segments, e.g. release/envelope)
 #
 # Fails if:
 #   - a valid example fails, or an invalid example passes;
@@ -77,7 +78,10 @@ check_group() {
     fi
     checked=$((checked + 1))
     local result=pass
-    if ! "$CHECK" --schemafile "$schema" "$example" >"$log" 2>&1; then
+    # --base-uri makes relative $refs (for example the envelope's "../v1.json")
+    # resolve to the schema files in this checkout instead of fetching the
+    # $id URLs, which are identifiers and not promised to be fetchable.
+    if ! "$CHECK" --base-uri "file://$PWD/$schema" --schemafile "$schema" "$example" >"$log" 2>&1; then
       result=fail
     fi
     if [[ "$result" != "$expect" ]]; then
