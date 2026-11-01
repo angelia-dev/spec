@@ -58,6 +58,15 @@ Published `v<major>` schemas are not edited in a breaking way.
 - **Later additive changes.** The `partitionkey` extension attribute (with the NATS, MQTT and Kafka sinks), a `release.unyanked` type, and a `release.advisory` type (PRD F15) are not in v1.
 - **Subscription filter on `bump: prerelease`.** The filter accepts only `major`, `minor`, `patch`; whether it should also accept `prerelease` is a watch-file question for the core repository.
 
+### Follow-ups in the core repo
+
+The accepted proposal changes things outside this repository. Each needs an issue in [angelia](https://github.com/angelia-dev/angelia):
+
+- **`instance.name` config key** (proposal Q3): a new instance configuration key, default `angelia`, pattern `^[a-z0-9][a-z0-9.-]{0,62}$`, used as `<instance>` in the envelope `source`.
+- **architecture.md §4 update**: rename `ecosystem` to `source`; the watch id is a bare ULID (not `w_123`) and the envelope `source` is `angelia://<instance>/watches/<watch_id>`; `time` is the emission time, not `detected_at`; add the new fields `normalized_version`, `backport` and `watch.name`.
+- **Emission rules for angelia-dev/angelia#106**: when each type is emitted, every field always present (`null`, never omitted), no extension attributes, and the purl built per source kind as [docs/release-event-v1.md](docs/release-event-v1.md) describes (for `pypi`, from the project name as PyPI reports it, not the PEP 503 form).
+- **Yank rules for angelia-dev/angelia#112**: `release.yanked` only for versions the watch has emitted, one event per watch per yank, repeating the stored classification with `cooldown_satisfied_at: null` and `detected_at` set to when the yank was seen; no un-yank event in v1.
+
 ## Licensing
 
 This repository is dual-licensed:
