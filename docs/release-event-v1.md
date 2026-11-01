@@ -224,7 +224,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 
 ## purl rules per source kind
 
-General rules, from the purl specification:
+General rules, from the purl specification (the one deliberate deviation is the case of `go-proxy` module paths, see the table):
 
 - Form: `pkg:<type>/<namespace>/<name>@<version>?<qualifiers>`. Each segment is percent-encoded: `@` in a namespace becomes `%40`, `+` in a version (SemVer build metadata) becomes `%2B`, `:` in a digest becomes `%3A`.
 - The version is the **raw** upstream version (`data.version`), so the purl names exactly what the registry serves.
@@ -233,14 +233,14 @@ General rules, from the purl specification:
 
 | Source kind | purl | Name and case rules | Example |
 | --- | --- | --- | --- |
-| `pypi` | `pkg:pypi/<name>@<version>` | Name lower-cased, runs of `-`, `_`, `.` replaced by one `-` (PEP 503). | `pkg:pypi/typing-extensions@4.12.2` for `typing_extensions` |
+| `pypi` | `pkg:pypi/<name>@<version>` | As the purl `pypi` type says: the project name lower-cased and each `_` replaced by `-`. A `.` is kept and runs are not collapsed, so this is **not** PEP 503 normalisation. The name is the project name as PyPI reports it, not `data.package` (which the source normalises per PEP 503, `zope-interface`). | `pkg:pypi/typing-extensions@4.12.2` for `typing_extensions`; `pkg:pypi/zope.interface@7.1.1` for `zope.interface` |
 | `npm` | `pkg:npm/<name>@<version>`, or `pkg:npm/%40<scope>/<name>@<version>` for a scoped package | The scope is the namespace, `@` percent-encoded. | `pkg:npm/%40angular/core@17.3.0` |
 | `crates` | `pkg:cargo/<name>@<version>` | Name as published. | `pkg:cargo/serde@1.0.215` |
 | `github-release` | `pkg:github/<owner>/<repo>@<tag>` | Owner and repo lower-cased. The version is the release's tag name. | `pkg:github/cli/cli@v2.62.0` |
 | `github-tag` | `pkg:github/<owner>/<repo>@<tag>` | Same as `github-release`: a release and its tag have the same purl; `data.source` tells them apart. | `pkg:github/golang/go@go1.23.3` |
 | `gitlab-release` | `pkg:gitlab/<group>/<subgroup...>/<project>@<tag>` | Every path segment except the last is the namespace, lower-cased. A self-managed GitLab adds `repository_url`. A watch whose `project` coordinate is a numeric id needs the source to report the path; otherwise `purl` is `null`. | `pkg:gitlab/gitlab-org/gitlab-runner@v17.5.0` |
 | `oci` | `pkg:oci/<image name>@sha256%3A<digest>?repository_url=<registry>/<path>&tag=<tag>` | The version is the manifest **digest**; the tag is the `tag` qualifier and the registry path the `repository_url` qualifier. Name is the last path segment, lower case. Until the source reports digests: a versionless purl with the `tag` qualifier. | `pkg:oci/node@sha256%3Ae3b0c4...?repository_url=docker.io/library/node&tag=22.11.0`; without digest `pkg:oci/node?repository_url=docker.io/library/node&tag=22.11.0` |
-| `go-proxy` | `pkg:golang/<module path>@<version>` | The module path's segments before the last are the namespace. Case is kept; the proxy's `!` escaping is not used. | `pkg:golang/github.com/gorilla/mux@v1.8.1` |
+| `go-proxy` | `pkg:golang/<module path>@<version>` | The module path's segments before the last are the namespace. **Case is kept**, which deviates from the purl `golang` type text (namespace and name lower-cased): Go module paths are case-sensitive, so lower-casing would name a different module. The proxy's `!` escaping is not used. | `pkg:golang/github.com/gorilla/mux@v1.8.1`; `pkg:golang/github.com/BurntSushi/toml@v1.4.0` |
 | `maven` | `pkg:maven/<groupId>/<artifactId>@<version>` | The group id is the namespace. A repository other than Maven Central adds `repository_url`. | `pkg:maven/org.slf4j/slf4j-api@2.0.16` |
 | `http-json`, `http-regex`, plugins | `null` | No package identity is known; a `pkg:generic/...` purl would invent one. | `null` |
 
