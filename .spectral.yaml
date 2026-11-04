@@ -1,0 +1,163 @@
+# Spectral ruleset for openapi/angelia.v1.yaml.
+#
+# spectral:oas with every recommended rule, plus rules that enforce the
+# conventions of docs/api.md. Every custom rule is an error: the CI job fails
+# on any finding (--fail-severity=hint), so a warning is not "clean" either.
+extends:
+  - [spectral:oas, recommended]
+
+rules:
+  # Off. OpenAPI 3.1 lets a security requirement of a non-OAuth scheme list
+  # role names (here the token scopes read, write, admin; OAS 3.1.0, Security
+  # Requirement Object), but this spectral:oas rule only knows OAuth2 scopes and reports
+  # every role as undefined. angelia-operation-security and
+  # angelia-operation-scope below check the requirements instead.
+  oas3-operation-security-defined: off
+  # A warning in spectral:oas; an error here so every tag an operation uses is
+  # documented in the top-level list.
+  operation-tag-defined: error
+
+  # Every path is under the major version prefix (docs/api.md, Versioning).
+  angelia-paths-under-v1:
+    description: Every path starts with /v1/.
+    severity: error
+    given: $.paths
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^/v1/'
+
+  # Paths use lower-case words joined by hyphens and {parameters}.
+  angelia-path-segments:
+    description: Path segments are lower-case words (a-z, 0-9, hyphen) or {parameters}.
+    severity: error
+    given: $.paths
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[a-z_]+\}))+$'
+
+  # Scopes must be explicit on every operation, never inherited from the
+  # document default (docs/api.md, Auth).
+  angelia-operation-security:
+    description: Every operation declares its own security requirement.
+    severity: error
+    given: $.paths[*][get,put,post,delete,patch]
+    then:
+      field: security
+      function: truthy
+
+  angelia-operation-scope:
+    description: Security requirements name only bearerAuth, with exactly one scope among read, write, admin.
+    severity: error
+    given: $..security[*]
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [bearerAuth]
+          additionalProperties: false
+          properties:
+            bearerAuth:
+              type: array
+              minItems: 1
+              maxItems: 1
+              items:
+                enum: [read, write, admin]
+
+  # Errors are RFC 9457 problem details (docs/api.md, Errors).
+  angelia-error-problem-json:
+    description: Shared responses are error responses and use application/problem+json only.
+    severity: error
+    given: $.components.responses[*]
+    then:
+      field: content
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [application/problem+json]
+          additionalProperties: false
+          properties:
+            application/problem+json: {}
+
+  angelia-error-responses-ref:
+    description: 4xx and 5xx responses of operations reference a shared problem response.
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^[45]/))]
+    resolved: false
+    then:
+      field: $ref
+      function: pattern
+      functionOptions:
+        match: '^#/components/responses/'
+
+  # Property names are snake_case, like the event schema and the watch file.
+  angelia-property-snake-case:
+    description: Schema property names are snake_case.
+    severity: error
+    given: $.components.schemas..properties
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'
+
+  # Secrets are write-only and never returned (architecture.md §8, issue #3).
+  # A secret-named property is one whose name ends in secret, token,
+  # password, passwd or key (optionally plural), as a word of a snake_case
+  # name: `(^|_)(secret|token|password|passwd|key)s?$`. Names ending in `_env`
+  # (references to environment variables) never match. `idempotency_key` is
+  # an identifier, not a secret, and is the one exception.
+  angelia-secrets-write-only:
+    description: A secret-named property is writeOnly.
+    severity: error
+    given: $.components.schemas..properties[?(@property.match(/^(?!idempotency_key$)(.*_)?(secret|token|password|passwd|key)s?$/))]
+    then:
+      field: writeOnly
+      function: truthy
+
+  angelia-no-secret-in-response-schema:
+    description: No 2xx response schema has a secret-named property.
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].schema..properties
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        notMatch: '^(?!idempotency_key$)(.*_)?(secret|token|password|passwd|key)s?$'
+
+  angelia-no-secret-in-response-example:
+    description: No 2xx response example has a secret-named member.
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].examples[*].value..[?(@property && @property.match && @property != 'idempotency_key' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
+    then:
+      function: undefined
+
+  # Every operation has an example request and response (issue #3).
+  angelia-success-response-example:
+    description: Every 2xx response with a body has at least one named example.
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*]
+    then:
+      field: examples
+      function: truthy
+
+  angelia-request-body-example:
+    description: Every request body has at least one named example.
+    severity: error
+    given: $.paths[*][*].requestBody.content[*]
+    then:
+      field: examples
+      function: truthy
+
+  angelia-parameter-example:
+    description: Every parameter has an example, so a GET has an example request too.
+    severity: error
+    given: $..parameters[*]
+    then:
+      field: example
+      function: defined

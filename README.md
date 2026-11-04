@@ -11,9 +11,11 @@ Part of [Angelia](https://github.com/angelia-dev), the self-hosted release event
 - `schemas/<type>/v<major>.json`: JSON Schema (2020-12) for each event type and major version.
 - `examples/valid/<type>/v<major>/`: examples that must validate against their schema.
 - `examples/invalid/<type>/v<major>/`: examples that must fail validation against their schema.
-- `openapi/`: OpenAPI specification (not yet populated).
+- `openapi/angelia.v1.yaml`: OpenAPI 3.1 specification of the REST API (`/v1`). Conventions: [docs/api.md](docs/api.md).
+- `.spectral.yaml`: the Spectral ruleset the OpenAPI specification must pass; CI runs it on each pull request and push to `main`.
 - `scripts/validate-examples.sh`: validates every example and every schema. CI runs it on each pull request and push to `main`.
-- `docs/`: per-field documentation and accepted proposals.
+- `scripts/check-go-stubs.sh`: generates Go server stubs from the OpenAPI specification with oapi-codegen and compiles them in a throwaway module (nothing is written to the repository). CI runs it too.
+- `docs/`: per-field documentation, API conventions and accepted proposals.
 
 When several event types carry the same payload, they share one schema: the three release types `dev.angelia.release.published.v1`, `dev.angelia.release.yanked.v1` and `dev.angelia.release.prerelease.v1` all use `schemas/release/v1.json` for `data`, and `schemas/release/envelope/v1.json` profiles their CloudEvents envelope.
 
@@ -24,6 +26,16 @@ When several event types carry the same payload, they share one schema: the thre
 | `dev.angelia.release.published.v1`, `dev.angelia.release.yanked.v1`, `dev.angelia.release.prerelease.v1` | [`schemas/release/v1.json`](schemas/release/v1.json) | [`schemas/release/envelope/v1.json`](schemas/release/envelope/v1.json) | [docs/release-event-v1.md](docs/release-event-v1.md) |
 
 All three are **drafts** (see [Versioning](#versioning)).
+
+## REST API
+
+[`openapi/angelia.v1.yaml`](openapi/angelia.v1.yaml) specifies the REST API of an Angelia instance (draft): watches, their known versions, the event log (cursor pull and server-sent events), sinks, subscriptions, deliveries with the dead-letter view and replay, and plugins. Its event payload references the release event schemas above. Naming, pagination, errors, auth and versioning: [docs/api.md](docs/api.md).
+
+Lint locally:
+
+```sh
+npx --yes @stoplight/spectral-cli@6.17.0 lint --fail-severity=hint openapi/angelia.v1.yaml
+```
 
 Validate locally:
 
