@@ -31,7 +31,7 @@ Each item names the option this draft takes, then the alternatives. Items marked
 21. **Body size.** Taken: `413 payload-too-large` above 1 MiB. Alternative: another limit, or one per resource.
 22. **Scopes.** Taken: one scope per operation, ordered `read` < `write` < `admin`; `read` for every `GET`, `write` for watches, subscriptions and replay, `admin` for sink writes (a sink names secrets and decides where requests go). Alternatives: `write` for sinks too; unordered scopes.
 23. **Auth before existence.** Taken: `401` and `403` are decided before `404`, so a token without the scope cannot probe which names exist.
-24. **No secret values in the v0 API.** Taken: the API accepts only references to environment variables (`*_env` keys), as the watch file does; it carries no secret value at all, so nothing is returned that could leak. Spectral rules forbid secret-named properties in responses and require `writeOnly` on any secret-named property. Write-only stored secrets (a `secrets` member, encrypted at rest) come with core #75. Please confirm this meets the issue's criterion "secrets are write-only in the schema".
+24. **No secret values in the v0 API.** Taken: the API accepts only references to environment variables (`*_env` keys), as the watch file does; it carries no secret value at all, so nothing is returned that could leak. Spectral rules forbid secret-named properties in responses and require `writeOnly` on any secret-named property. Write-only stored secrets came with core #75 as named secrets instead (items 33 to 37). Please confirm this meets the issue's criterion "secrets are write-only in the schema".
 25. **Allowlist of environment variables (core, new instance config key).** Taken: a `*_env` name set through the API must be listed in a new instance configuration key, proposed as `api.allowed_env` (a list of exact variable names, default empty: the API cannot set any `*_env` key, and sinks that need a secret come from the watch file). Names starting with `ANGELIA_` are always refused. Refused names get `422 env-not-allowed`. The key name, and whether it accepts patterns such as `CI_*`, are a public contract of the instance configuration. Alternatives: no allowlist (any API writer with `admin` could make the instance send any of its environment variables to a sink URL); a prefix such as `ANGELIA_SINK_` reserved for sink secrets.
 26. **Sink redaction.** Taken: below `admin`, every URL in a sink's `config` is cut to `scheme://host` and `url_redacted` is true (chat webhook URLs carry their secret in the path, core ADR 0017 §7). A key a kind's `config_schema` marks `x-angelia-secret: true` is replaced by `[REDACTED]` for every caller, listed in `masked_fields`, and cannot be set through the API. A Spectral rule for `x-angelia-secret` is not feasible: config schemas come from the kinds at run time, not from this document. Alternatives: hide sink `config` from `read` entirely; return `null` instead of `[REDACTED]`.
 27. **Sink `config` is free-form.** Taken: `SinkConfig` is an open object validated against the kind's `config_schema`; the built-in kinds' configurations are documented as schemas (`WebhookSinkConfig`) listed in `x-angelia-kind-config`. Alternative: `oneOf` with a `kind` discriminator (closed to plugin kinds).
@@ -40,6 +40,11 @@ Each item names the option this draft takes, then the alternatives. Items marked
 30. **Durations.** Taken: whole seconds are kept and fractions cut; a negative subscription `policy.cooldown` is clamped to `0` as in the watch file; a negative watch `policy.cooldown` is an error. Alternative: reject negative values everywhere.
 31. **Code-generation hint.** Taken: `EventRecord.event` carries `x-go-type: json.RawMessage` because oapi-codegen cannot generate a type from the external envelope schema. Alternative: bundle the schema into the document before generation.
 32. **Versioning and licence.** Taken: `/v1` in the path, `info.version` following spec releases (0.1.0); `info.license` is `Apache-2.0 OR CC-BY-4.0`, as the README says for `openapi/`.
+33. **Stored secrets (core #75, ADR 0024).** Taken: `/v1/secrets/{name}` stores a value encrypted at rest under a name; `PUT` takes `value` (text) or `value_base64` (any bytes), at most 64 KiB, both `writeOnly`, and optional `hosts`; `GET` returns `name`, `hosts`, `key_id`, the times and `referenced_by`, never the value; `DELETE` is refused with `409 secret-in-use` while a reference exists. Every operation, reads included, needs `admin`: names, hosts and referrers map the instance's credentials. Alternatives: a per-sink `secrets` member (one value could not serve several sinks, and rotation would touch every sink); `read` for the metadata.
+34. **References are `*_ref` keys.** Taken: a configuration key whose name ends in `_ref` holds the name of a stored secret, as a key ending in `_env` holds the name of an environment variable (`secret_ref` for the webhook signing secret, at most one of `secret_ref` and `secret_env`). It is a name, never a value, and is returned as written. A reference to a secret that does not exist is accepted (deliveries fail, retried, until it is stored). Alternatives: a structured `{"$secret": name}` value; interpolation in strings.
+35. **Admin scope for references.** Taken: a write that adds, removes or changes a `*_ref` key needs `admin`, on any endpoint (watches and subscriptions too); a `write` token gets `403` with `required_scope: admin`. Writes that leave every `*_ref` unchanged keep the endpoint's scope. Alternative: an allowlist like `api.allowed_env` (it limits which secrets, not where they go).
+36. **Host binding.** Taken: a secret's `hosts` (`host` or `host:port`, exact match, no wildcards) limits where it is sent; a source or registry credential may only reference a bound secret (`422 secret-host-binding-required`). A kind's `config_schema` marks the URL a sink sends to with `x-angelia-destination: true`. Alternative: wildcards such as `*.example.com` (later, additive).
+37. **Explicit lint for secret values.** Taken: the secret-name rules do not match `value`, so Spectral rules name `SecretWrite.value` and `value_base64`: both must be `writeOnly`, and no 2xx response schema or example may have a member of either name.
 
 Core follow-ups found while writing this specification (not decisions on the API):
 
@@ -56,6 +61,7 @@ Core follow-ups found while writing this specification (not decisions on the API
 | Versions (per watch, read-only) | `/v1/watches/{name}/versions` | `read` | none |
 | Events (read-only) | `/v1/events`, `/v1/events/stream`, `/v1/events/{id}` | `read` | none |
 | Sinks | `/v1/sinks`, `/v1/sinks/{name}` | `read` (redacted) | `admin` (`PUT`, `DELETE`) |
+| Secrets (values write-only) | `/v1/secrets`, `/v1/secrets/{name}` | `admin` (metadata only) | `admin` (`PUT`, `DELETE`) |
 | Subscriptions | `/v1/subscriptions`, `/v1/subscriptions/{name}` | `read` | `write` (`PUT`, `DELETE`) |
 | Deliveries | `/v1/deliveries`, `/v1/deliveries/{id}` | `read` | none |
 | Replay | `/v1/deliveries/{id}/replay`, `/v1/replays` (`POST`) | none | `write` |
@@ -171,6 +177,10 @@ Each `type` is `https://github.com/angelia-dev/spec/blob/main/docs/api.md#proble
 
 `409`. Deleting a sink that a subscription uses.
 
+#### Problem: secret-in-use
+
+`409`. Deleting a stored secret that configuration still references with a `*_ref` key; `detail` names the referrers.
+
 #### Problem: not-replayable
 
 `409`. Replaying a `pending` or `in_flight` delivery, or one whose subscription or sink is gone.
@@ -190,6 +200,14 @@ Each `type` is `https://github.com/angelia-dev/spec/blob/main/docs/api.md#proble
 #### Problem: env-not-allowed
 
 `422`. A `*_env` key names an environment variable the instance configuration does not allow, or one starting with `ANGELIA_`.
+
+#### Problem: secrets-key-missing
+
+`422`. Storing a secret on an instance that has no secrets key configured (`secrets.key_file`). Nothing is stored.
+
+#### Problem: secret-host-binding-required
+
+`422`. A source or registry credential references a stored secret that has no `hosts`: such a secret must be bound to the hosts it is sent to.
 
 #### Problem: validation-failed
 
@@ -211,19 +229,22 @@ Every request carries an API token: `Authorization: Bearer <token>`. A token has
 | --- | --- |
 | `read` | every `GET`, including the event stream; sink URLs are cut to `scheme://host` |
 | `write` | `PUT` and `DELETE` of watches and subscriptions, replay of deliveries |
-| `admin` | `PUT` and `DELETE` of sinks, which name secrets and decide where the instance sends requests; full sink URLs |
+| `admin` | `PUT` and `DELETE` of sinks, which name secrets and decide where the instance sends requests; full sink URLs; every operation on `/v1/secrets`; any write that adds, removes or changes a `*_ref` key |
 
 Each operation in the specification declares the scope it needs in its `security` requirement (OpenAPI 3.1 allows role names for a non-OAuth scheme). How tokens are created, stored and revoked is the core repository's API tokens story; OIDC may come later.
 
 ## Secrets
 
-The v0 API carries **no secret values**, in requests or responses.
+Secret values are stored through the API, **write-only** and encrypted at rest by the instance ([core ADR 0024](https://github.com/angelia-dev/angelia/blob/main/docs/adr/0024-secrets-encrypted-at-rest.md)). No response carries a value.
 
-- A sink names a secret the same way the watch file does, with a `*_env` key in `config` (`secret_env` for the webhook signing secret): the name of an environment variable of the instance. The name is not a secret and is returned.
-- A name set through the API must be allowed by the instance configuration (proposed key `api.allowed_env`, default empty); names starting with `ANGELIA_` are always refused (`422 env-not-allowed`). With the default, sinks that need a secret come from the watch file.
+- `PUT /v1/secrets/{name}` stores `value` (text, stored as its UTF-8 bytes exactly) or `value_base64` (any bytes), at most 64 KiB, with optional `hosts`. Both value members are `writeOnly`; they never appear in a response, a log, an audit record or a problem detail (a value that is too large reports its size only). The instance needs a key (`422 secrets-key-missing` otherwise).
+- `GET /v1/secrets[/{name}]` returns the name, `hosts`, `key_id`, `created_at`, `updated_at` and `referenced_by`. Every operation on `/v1/secrets` needs `admin`.
+- Configuration names a stored secret with a key ending in `_ref` (`secret_ref` for the webhook signing secret), or an environment variable of the instance with a key ending in `_env` (`secret_env`). Both are names, not secrets, and are returned as written. A write that adds, removes or changes a `*_ref` key needs `admin`, whatever the endpoint's scope.
+- A `*_env` name set through the API must be allowed by the instance configuration (`api.allowed_env`, default empty); names starting with `ANGELIA_` are always refused (`422 env-not-allowed`).
+- `hosts` binds a secret to the hosts it may be sent to (`host` or `host:port`, exact match). A bound secret is resolved only for such a destination, and every request carrying it is checked again, redirects included. A source or registry credential may only reference a bound secret (`422 secret-host-binding-required`).
+- `DELETE /v1/secrets/{name}` is refused with `409 secret-in-use` while a reference exists.
 - Below the `admin` scope, URLs in a sink's `config` are cut to `scheme://host` (`url_redacted: true`), because chat webhook URLs carry a secret in their path.
-- A kind can mark a configuration key as a secret value with `x-angelia-secret: true` in its `config_schema`. The server masks such a key as `[REDACTED]` in every response (listed in `masked_fields`) and refuses it in API writes.
-- Stored secret values, write-only and encrypted at rest, are left to the core's secrets story (#75), as an additive change.
+- A kind can mark a configuration key as a secret value with `x-angelia-secret: true` in its `config_schema`. The server masks such a key as `[REDACTED]` in every response (listed in `masked_fields`) and refuses it in API writes; kinds use `*_ref` keys instead. `x-angelia-destination: true` marks the URL a sink sends to, which a referenced secret's `hosts` must allow.
 
 ## Versioning
 
@@ -239,7 +260,7 @@ CI checks that the stubs generate and compile: [`scripts/check-go-stubs.sh`](../
 
 ## Lint
 
-CI lints the specification with [Spectral](https://github.com/stoplightio/spectral) and the ruleset in [`.spectral.yaml`](../.spectral.yaml): `spectral:oas` plus rules for the conventions above (paths under `/v1`, `snake_case` properties, one scope per operation, problem details for errors, no secret-named property in a response schema or example and `writeOnly` on any secret-named property, an example for every request, response and parameter). Run it locally:
+CI lints the specification with [Spectral](https://github.com/stoplightio/spectral) and the ruleset in [`.spectral.yaml`](../.spectral.yaml): `spectral:oas` plus rules for the conventions above (paths under `/v1`, `snake_case` properties, one scope per operation, problem details for errors, no secret-named property in a response schema or example and `writeOnly` on any secret-named property, `writeOnly` on the stored-secret members `value` and `value_base64` and neither of them in any response schema or example, an example for every request, response and parameter). Run it locally:
 
 ```sh
 npx --yes @stoplight/spectral-cli@6.17.0 lint --fail-severity=hint openapi/angelia.v1.yaml

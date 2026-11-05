@@ -161,3 +161,43 @@ rules:
     then:
       field: example
       function: defined
+
+  # Stored secret values (core ADR 0024, sections 1 and 7). The rules above
+  # match secret-*named* properties only, and the value members of
+  # SecretWrite are not secret-named, so these rules name them explicitly:
+  # both are writeOnly, and neither appears in any 2xx response schema or
+  # example.
+  angelia-secret-value-members:
+    description: SecretWrite has the value members value and value_base64.
+    severity: error
+    given: $.components.schemas.SecretWrite.properties
+    then:
+      - field: value
+        function: truthy
+      - field: value_base64
+        function: truthy
+
+  angelia-secret-value-write-only:
+    description: The value members of SecretWrite (value, value_base64) are writeOnly.
+    severity: error
+    given: $.components.schemas.SecretWrite.properties[value,value_base64]
+    then:
+      field: writeOnly
+      function: truthy
+
+  angelia-no-secret-value-in-response-schema:
+    description: No 2xx response schema has a value or value_base64 property.
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].schema..properties
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        notMatch: '^value(_base64)?$'
+
+  angelia-no-secret-value-in-response-example:
+    description: No 2xx response example has a value or value_base64 member.
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].examples[*].value..[?(@property === 'value' || @property === 'value_base64')]
+    then:
+      function: undefined

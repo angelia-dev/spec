@@ -29,7 +29,7 @@ All three are **drafts** (see [Versioning](#versioning)).
 
 ## REST API
 
-[`openapi/angelia.v1.yaml`](openapi/angelia.v1.yaml) specifies the REST API of an Angelia instance (draft): watches, their known versions, the event log (cursor pull and server-sent events), sinks, subscriptions, deliveries with the dead-letter view and replay, and plugins. Its event payload references the release event schemas above. Naming, pagination, errors, auth and versioning: [docs/api.md](docs/api.md).
+[`openapi/angelia.v1.yaml`](openapi/angelia.v1.yaml) specifies the REST API of an Angelia instance (draft): watches, their known versions, the event log (cursor pull and server-sent events), sinks, write-only stored secrets, subscriptions, deliveries with the dead-letter view and replay, and plugins. Its event payload references the release event schemas above. Naming, pagination, errors, auth and versioning: [docs/api.md](docs/api.md).
 
 Lint locally:
 
