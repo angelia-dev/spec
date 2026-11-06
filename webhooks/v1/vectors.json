@@ -289,7 +289,7 @@
       }
     }
   ],
-  "description": "Standard Webhooks v1 test vectors for deliveries sent by Angelia's webhook sink. Licensed CC-BY-4.0. Secrets are synthetic: secret N is whsec_ plus the standard base64 of SHA-256 of the ASCII label 'angelia-spec/webhooks/v1/secret/N'.",
+  "description": "Standard Webhooks v1 test vectors for deliveries sent by Angelia's webhook sink. Licensed CC-BY-4.0. Generated with a one-off Go program that copies Angelia's Sign (angelia 2f277d6) and checks the Standard Webhooks reference vector; recomputed independently by scripts/check-webhook-vectors.py. Secrets are synthetic: secret N is whsec_ plus the standard base64 of SHA-256 of the ASCII label 'angelia-spec/webhooks/v1/secret/N'.",
   "tolerance_seconds": 300,
   "version": "1"
 }

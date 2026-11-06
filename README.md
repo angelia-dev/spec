@@ -52,6 +52,8 @@ scripts/validate-examples.sh
 
 Each case gives the secrets that sign the message, the `webhook-id` (`<event ULID>:<subscription ULID>`), `webhook-timestamp` and `webhook-signature`, the exact body bytes, the receiver's secrets and clock (`now`), and the expected result. The cases cover one secret, three secrets during a rotation (a receiver holding any one of them accepts the message), a template body, a wrong secret, a tampered body, and timestamps exactly at the 5 minute tolerance (accepted, inclusive in both directions) and one second beyond it (rejected with `timestamp`). Bodies are the release events of [`examples/valid/`](examples/valid/release/envelope/v1) in CloudEvents structured mode. Secrets are synthetic: secret N is `whsec_` plus the base64 of the SHA-256 of `angelia-spec/webhooks/v1/secret/N`. Never use them for anything else.
 
+Provenance: generated with a one-off Go program that copies Angelia's Sign (angelia 2f277d6) and checks the Standard Webhooks reference vector; recomputed independently by scripts/check-webhook-vectors.py.
+
 The vectors file is licensed under [CC-BY-4.0](LICENSE-SCHEMAS), like the schemas.
 
 ## Versioning

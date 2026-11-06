@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Recomputes every signature and expected result in webhooks/v1/vectors.json.
 
-Independent of the Go generator: HMAC-SHA256 over "<id>.<timestamp>.<body>",
-base64, one "v1,<sig>" entry per signing secret. Also checks the Standard
-Webhooks reference vector, so a bug in this checker cannot hide a bad file.
+The file was generated with a one-off Go program that copies Angelia's Sign
+(angelia 2f277d6) and checks the Standard Webhooks reference vector. This
+script recomputes it independently: HMAC-SHA256 over "<id>.<timestamp>.<body>",
+base64, one "v1,<sig>" entry per signing secret. It checks the same reference
+vector, so a bug here cannot hide a bad file. It also requires unique case
+names, and for tampered-body that the recomputed signature differs from the
+header and the expected error is no_matching_signature.
 """
 import base64, hashlib, hmac, json, sys
 
@@ -34,12 +38,19 @@ if ref != "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=":
     errors.append("checker does not reproduce the Standard Webhooks reference vector")
 
 doc = json.load(open(path, encoding="utf-8"))
+names = [c["name"] for c in doc["cases"]]
+for n in sorted({n for n in names if names.count(n) > 1}):
+    errors.append(f"duplicate case name: {n}")
 for c in doc["cases"]:
     h = c["headers"]
-    if c["name"] != "tampered-body":
-        exp_sig = sign(c["sign_secrets"], h["webhook-id"], h["webhook-timestamp"], c["body"])
-        if exp_sig != h["webhook-signature"]:
-            errors.append(f"{c['name']}: signature does not match sign_secrets")
+    exp_sig = sign(c["sign_secrets"], h["webhook-id"], h["webhook-timestamp"], c["body"])
+    if c["name"] == "tampered-body":
+        if exp_sig == h["webhook-signature"]:
+            errors.append("tampered-body: recomputed signature equals the header")
+        if c["expected"] != {"valid": False, "error": "no_matching_signature"}:
+            errors.append("tampered-body: expected must be no_matching_signature")
+    elif exp_sig != h["webhook-signature"]:
+        errors.append(f"{c['name']}: signature does not match sign_secrets")
     err = verify(c["receiver_secrets"], h, c["body"], c["now"], doc["tolerance_seconds"])
     if (err is None) != c["expected"]["valid"] or err != c["expected"].get("error"):
         errors.append(f"{c['name']}: expected {c['expected']}, recomputed error={err}")
