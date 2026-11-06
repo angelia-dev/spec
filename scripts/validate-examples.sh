@@ -14,7 +14,10 @@
 #     error message counts as a correct failure;
 #   - an example is not parseable JSON, or is not a .json file;
 #   - an example has no matching schema, or a schema is not valid JSON Schema;
-#   - no examples were found at all.
+#   - no examples were found at all;
+#   - webhooks/v1/vectors.json does not validate against
+#     schemas/webhooks/v1.json, or a signature or expected result in it does
+#     not recompute (scripts/check-webhook-vectors.py).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -101,6 +104,21 @@ check_group() {
 
 check_group valid pass
 check_group invalid fail
+
+# 4. The webhook test vectors must match their schema and recompute.
+vectors=webhooks/v1/vectors.json
+if [[ ! -f "$vectors" ]]; then
+  fail "missing $vectors"
+elif ! "$CHECK" --base-uri "file://$PWD/schemas/webhooks/v1.json" --schemafile schemas/webhooks/v1.json "$vectors" >"$log" 2>&1; then
+  fail "[webhooks] $vectors does not validate against schemas/webhooks/v1.json"
+  cat "$log"
+elif ! python3 scripts/check-webhook-vectors.py "$vectors" >"$log" 2>&1; then
+  fail "[webhooks] $vectors does not recompute"
+  cat "$log"
+else
+  checked=$((checked + 1))
+  echo "ok   [webhooks] $vectors; $(cat "$log")"
+fi
 
 echo
 if [[ "$failures" -gt 0 ]]; then

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/angelia-dev/spec/schemas/webhooks/v1.json",
+  "title": "Angelia webhook test vectors, v1 (draft, pre-1.0)",
+  "description": "Shape of webhooks/v1/vectors.json: Standard Webhooks v1 test vectors for the deliveries of Angelia's webhook sink. Each case gives the secrets that sign the message, the headers and exact body bytes as sent, the receiver's secrets and clock, and the expected result of verification. DRAFT: while the spec repository is at version 0.x this file may still change in any 0.x minor release.",
+  "$comment": "Decided in the core repository, ADR 0023 section 7 (decided question 7). Licensed CC-BY-4.0 like the other schemas.",
+  "type": "object",
+  "required": ["version", "description", "tolerance_seconds", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1" },
+    "description": { "type": "string", "minLength": 1 },
+    "tolerance_seconds": {
+      "description": "The timestamp tolerance every case is checked with, inclusive at both ends.",
+      "const": 300
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "secret": {
+      "description": "A synthetic secret: whsec_ plus padded standard base64 of 24 to 64 bytes (32 to 88 characters).",
+      "type": "string",
+      "pattern": "^whsec_(?:[A-Za-z0-9+/]{4}){8,21}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    },
+    "secrets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/secret" }
+    },
+    "case": {
+      "type": "object",
+      "required": ["name", "description", "sign_secrets", "receiver_secrets", "content_type", "headers", "body", "now", "expected"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "description": { "type": "string", "minLength": 1 },
+        "sign_secrets": {
+          "description": "The secrets the sender signed with, in the order of the entries of webhook-signature (one to three; three during a rotation).",
+          "$ref": "#/$defs/secrets"
+        },
+        "receiver_secrets": {
+          "description": "The secrets the receiver verifies with.",
+          "$ref": "#/$defs/secrets"
+        },
+        "content_type": {
+          "description": "The Content-Type header Angelia sends with the body. Not signed.",
+          "type": "string",
+          "minLength": 1
+        },
+        "headers": {
+          "type": "object",
+          "required": ["webhook-id", "webhook-timestamp", "webhook-signature"],
+          "additionalProperties": false,
+          "properties": {
+            "webhook-id": {
+              "description": "<event ULID>:<subscription ULID>.",
+              "type": "string",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}:[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+            },
+            "webhook-timestamp": {
+              "description": "Unix time in seconds, as decimal ASCII digits. The exact string is signed.",
+              "type": "string",
+              "pattern": "^[0-9]{1,18}$"
+            },
+            "webhook-signature": {
+              "description": "One to three space-separated v1,<base64 HMAC-SHA256> entries, one per signing secret, in order.",
+              "type": "string",
+              "pattern": "^v1,[A-Za-z0-9+/]{43}=(?: v1,[A-Za-z0-9+/]{43}=){0,2}$"
+            }
+          }
+        },
+        "body": {
+          "description": "The exact body bytes that were signed and sent, as a UTF-8 string. Do not parse and re-serialise it before verifying.",
+          "type": "string"
+        },
+        "now": {
+          "description": "The receiver's clock, in Unix seconds.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected": {
+          "type": "object",
+          "required": ["valid"],
+          "additionalProperties": false,
+          "properties": {
+            "valid": { "type": "boolean" },
+            "error": {
+              "description": "Why verification must fail: timestamp (outside the tolerance or malformed) or no_matching_signature. Present exactly when valid is false.",
+              "enum": ["timestamp", "no_matching_signature"]
+            }
+          },
+          "oneOf": [
+            { "properties": { "valid": { "const": true } }, "not": { "required": ["error"] } },
+            { "properties": { "valid": { "const": false } }, "required": ["error"] }
+          ]
+        }
+      }
+    }
+  }
+}
