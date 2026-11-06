@@ -14,6 +14,8 @@ Part of [Angelia](https://github.com/angelia-dev), the self-hosted release event
 - `openapi/angelia.v1.yaml`: OpenAPI 3.1 specification of the REST API (`/v1`). Conventions: [docs/api.md](docs/api.md).
 - `.spectral.yaml`: the Spectral ruleset the OpenAPI specification must pass; CI runs it on each pull request and push to `main`.
 - `scripts/validate-examples.sh`: validates every example and every schema. CI runs it on each pull request and push to `main`.
+- `webhooks/v1/vectors.json`: Standard Webhooks test vectors for Angelia's webhook sink, described by `schemas/webhooks/v1.json`. See [Webhook test vectors](#webhook-test-vectors).
+- `scripts/check-webhook-vectors.py`: recomputes every signature and expected result in the vectors; `scripts/validate-examples.sh` runs it.
 - `scripts/check-go-stubs.sh`: generates Go server stubs from the OpenAPI specification with oapi-codegen and compiles them in a throwaway module (nothing is written to the repository). CI runs it too.
 - `docs/`: per-field documentation, API conventions and accepted proposals.
 
@@ -43,6 +45,16 @@ Validate locally:
 python -m pip install "check-jsonschema==0.38.2"
 scripts/validate-examples.sh
 ```
+
+## Webhook test vectors
+
+[`webhooks/v1/vectors.json`](webhooks/v1/vectors.json) holds [Standard Webhooks](https://www.standardwebhooks.com/) v1 test vectors shaped like the deliveries of Angelia's webhook sink, so a receiver in any language can check its verification against what Angelia sends. The file is described by [`schemas/webhooks/v1.json`](schemas/webhooks/v1.json) (draft, like the event schemas).
+
+Each case gives the secrets that sign the message, the `webhook-id` (`<event ULID>:<subscription ULID>`), `webhook-timestamp` and `webhook-signature`, the exact body bytes, the receiver's secrets and clock (`now`), and the expected result. The cases cover one secret, three secrets during a rotation (a receiver holding any one of them accepts the message), a template body, a wrong secret, a tampered body, and timestamps exactly at the 5 minute tolerance (accepted, inclusive in both directions) and one second beyond it (rejected with `timestamp`). Bodies are the release events of [`examples/valid/`](examples/valid/release/envelope/v1) in CloudEvents structured mode. Secrets are synthetic: secret N is `whsec_` plus the base64 of the SHA-256 of `angelia-spec/webhooks/v1/secret/N`. Never use them for anything else.
+
+Provenance: generated with a one-off Go program that copies Angelia's Sign (angelia 2f277d6) and checks the Standard Webhooks reference vector; recomputed independently by scripts/check-webhook-vectors.py.
+
+The vectors file is licensed under [CC-BY-4.0](LICENSE-SCHEMAS), like the schemas.
 
 ## Versioning
 
@@ -84,6 +96,6 @@ The accepted proposal changes things outside this repository. Each needs an issu
 This repository is dual-licensed:
 
 - **Code** (scripts, CI configuration and tooling) is licensed under [Apache-2.0](LICENSE).
-- **Schemas and examples** (`schemas/`, `examples/`, and the OpenAPI specification under `openapi/`) are also licensed under [CC-BY-4.0](LICENSE-SCHEMAS). You may use them under either license.
+- **Schemas, examples and test vectors** (`schemas/`, `examples/`, `webhooks/`, and the OpenAPI specification under `openapi/`) are also licensed under [CC-BY-4.0](LICENSE-SCHEMAS). You may use them under either license.
 
 The full CC-BY-4.0 legal code is in [LICENSE-SCHEMAS](LICENSE-SCHEMAS). Official text: <https://creativecommons.org/licenses/by/4.0/legalcode>.
