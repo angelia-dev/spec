@@ -52,6 +52,7 @@ Each item names the option this draft takes, then the alternatives. Items marked
     3. *Truncation.* Deterministic: every string value is cut to 2048 bytes at a UTF-8 boundary and `truncated: true` is set if any was cut; `inputs` values are cut to 1024 bytes with no marker. Alternative: a permanent error when a value is too long (nothing is delivered, but nothing is silently shortened).
     4. *Rate limits.* A `403` or `429` caused by a rate limit is retried after `Retry-After` or `x-ratelimit-reset`; other `4xx` (including `404`, `422`) are permanent. Alternative: all `403` permanent (simpler, but a rate-limited delivery would die).
     5. *Token kinds.* Fine-grained personal tokens and GitHub App installation tokens work as the token; minting an installation token from an App key is not part of this kind (a later kind option, additive).
+    6. *Clarifications of 2026-11-07 (maintainer-approved, core #113, spec 0.3.1).* Matching the sink as merged in core PR #204: (a) an `inputs` name must not end in `_env` or `_ref`, because the core would read the value as a reference (the schema has a `propertyNames` rule); (b) the `repository_dispatch` size guard: strings are cut to 2048 bytes, and if the JSON body would still exceed 60000 bytes (escaped control characters), the cut length halves (1024, 512, ...) until it fits, with `truncated: true`. This narrows the unreleased 0.3.0 contract.
 
 Core follow-ups found while writing this specification (not decisions on the API):
 
