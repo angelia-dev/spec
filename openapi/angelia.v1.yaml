@@ -293,9 +293,11 @@ paths:
 
         With `consumer`, the server keeps the cursor: the page starts after the consumer's
         `acked_seq` and uses the consumer's stored filter, exactly as `after=<acked_seq>` with
-        that filter would. `consumer` cannot be combined with `after`, `watch`, `type` or `source`
-        (`400 bad-request`); an unknown consumer gets `404`, and a consumer whose `acked_seq` is
-        below the highest pruned `seq` gets `410 cursor-expired`. Reading never acknowledges: the
+        that filter would. `consumer` cannot be combined with `after`, `watch`, `type` or `source`:
+        exclusivity is by presence, so `consumer` with `after=0` or an empty `watch=` also gets
+        `400 bad-request`. An unknown consumer gets `404`, and a consumer whose `acked_seq` is
+        below the highest pruned `seq` gets `410 cursor-expired`; unlike `after=0`, an `acked_seq`
+        of `0` is checked like any other position. Reading never acknowledges: the
         client acknowledges with `POST /v1/consumers/{name}/ack` (for example the page's
         `next_after`) once it has processed the page.
       tags: [events]
@@ -307,7 +309,7 @@ paths:
         - $ref: '#/components/parameters/WatchFilter'
         - $ref: '#/components/parameters/TypeFilter'
         - $ref: '#/components/parameters/SourceFilter'
-        - $ref: '#/components/parameters/ConsumerCursor'
+        - $ref: '#/components/parameters/ConsumerParam'
       responses:
         '200':
           description: The events after the cursor, oldest first.
@@ -351,9 +353,12 @@ paths:
           not a stream).
         - With `consumer`, the stream starts after the consumer's `acked_seq` and uses its stored
           filter; `Last-Event-ID` still takes precedence over `acked_seq`. As on `GET /v1/events`,
-          `consumer` cannot be combined with `after`, `watch`, `type` or `source` (`400`), an
+          `consumer` cannot be present with `after`, `watch`, `type` or `source` (`400`), an
           unknown consumer gets `404`, and an expired cursor gets `410` before the stream starts.
-          The stream never acknowledges: the client calls `POST /v1/consumers/{name}/ack`.
+          The consumer is read once, when the stream starts: an open stream keeps the filter as it
+          was then (watch names resolved once), and a later `PUT` or `DELETE` of the consumer
+          does not affect it. The stream never acknowledges: the client calls
+          `POST /v1/consumers/{name}/ack`.
         - The server sends a comment line (`: keep-alive`) when nothing else was sent for 15 seconds.
         - The token is sent in the `Authorization` header, so the browser `EventSource` API, which
           cannot set headers, cannot use this endpoint; use a fetch-based SSE client. The token is
@@ -367,7 +372,7 @@ paths:
         - $ref: '#/components/parameters/WatchFilter'
         - $ref: '#/components/parameters/TypeFilter'
         - $ref: '#/components/parameters/SourceFilter'
-        - $ref: '#/components/parameters/ConsumerCursor'
+        - $ref: '#/components/parameters/ConsumerParam'
         - name: Last-Event-ID
           in: header
           description: The `seq` of the last event the client received. Takes precedence over `after` and over a consumer's `acked_seq`.
@@ -509,9 +514,11 @@ paths:
         the cursor. Reading never acknowledges.
 
         The body replaces the whole `filter` (an omitted `filter` matches every event). `start`
-        applies only when the consumer is created: `latest` (the default) sets `acked_seq` to the
-        highest committed `seq`, so the consumer receives only events committed from then on;
-        `earliest` sets it to `0`, the oldest event kept. On an existing consumer `start` is
+        applies only when the consumer is created: `latest` (the default) sets `acked_seq` to
+        the highest `seq` ever committed (pruned events included) when the create commits, so the consumer
+        receives only events committed after it (an event committed concurrently with the create
+        may or may not be included); `earliest` sets it to the highest pruned `seq` (`0` on a log
+        that was never pruned), so the consumer starts at the oldest event kept. On an existing consumer `start` is
         ignored, and no `PUT` ever moves `acked_seq`: changing the filter applies to the events
         after the current cursor only. Sending the same filter twice changes nothing the second
         time (`Angelia-Change: unchanged`).
@@ -618,7 +625,7 @@ paths:
         the cursor back. An acknowledged position does not have to match the consumer's filter:
         acknowledging a page's `next_after` skips the events the filter left out.
 
-        A `seq` above the highest committed `seq`, or an `event_id` the log does not hold (never
+        A `seq` above the highest `seq` ever committed (pruned events included), or an `event_id` the log does not hold (never
         emitted, or already pruned), is refused with `422 validation-failed` and a pointer to the
         member. A consumer whose cursor fell behind retention (`410 cursor-expired` on read)
         recovers by acknowledging `oldest_seq − 1`, accepting the gap.
@@ -1566,12 +1573,13 @@ components:
       schema:
         $ref: '#/components/schemas/Seq'
       example: 4180
-    ConsumerCursor:
+    ConsumerParam:
       name: consumer
       in: query
       description: |
         Read through this consumer: start after its `acked_seq`, with its stored filter. Exclusive
-        with `after`, `watch`, `type` and `source` (combining them gets `400`). Reading never moves
+        with `after`, `watch`, `type` and `source` by presence: sending any of them with `consumer`,
+        even `after=0` or an empty value, gets `400`. Reading never moves
         the consumer's cursor; `POST /v1/consumers/{name}/ack` does.
       schema:
         $ref: '#/components/schemas/Name'
@@ -2063,21 +2071,25 @@ components:
     ConsumerFilter:
       description: |
         Which events a consumer reads: the keys and values of the `GET /v1/events` filters. All
-        given keys must match; an empty or absent key matches every event. Stored as written;
-        watch names are resolved at each read, as the `watch` query parameter is.
+        given keys must match; an empty or absent key matches every event (so an empty `type`
+        means all types, unlike `SubscriptionFilter`, whose default is `release.published`).
+        Stored as written; watch names are resolved at each request, as the `watch` query
+        parameter is, and once per stream when a stream starts.
       type: object
       additionalProperties: false
       properties:
         watch:
           description: Watches, each by name or by id. A name means the watch's current id; an id also matches events of a watch that was deleted or renamed.
           type: array
+          maxItems: 100
           uniqueItems: true
           items:
             $ref: '#/components/schemas/NameOrId'
           default: []
         type:
-          description: Short event types.
+          description: Short event types. Empty means every type.
           type: array
+          maxItems: 100
           uniqueItems: true
           items:
             $ref: '#/components/schemas/ShortEventType'
@@ -2085,14 +2097,17 @@ components:
         source:
           description: Source kinds, matched against the event's `data.source` (always the base kind).
           type: array
+          maxItems: 100
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Kind'
           default: []
     ConsumerStart:
       description: |
-        Where a new consumer's cursor starts. `latest`: at the highest committed `seq`, so it reads
-        only events committed after its creation. `earliest`: at `0`, the oldest event kept.
+        Where a new consumer's cursor starts. `latest`: at the highest `seq` ever committed (pruned events included)
+        when the create commits, so it reads only events committed after its creation (an event
+        committed concurrently may or may not be included). `earliest`: at the highest pruned
+        `seq` (`0` on a log that was never pruned), so it reads from the oldest event kept.
       type: string
       enum: [latest, earliest]
     ConsumerWrite:
@@ -2144,7 +2159,7 @@ components:
       properties:
         seq:
           $ref: '#/components/schemas/Seq'
-          description: An event's `seq`, or a page's `next_after`. At most the highest committed `seq`.
+          description: An event's `seq`, or a page's `next_after`. At most the highest `seq` ever committed (pruned events included), so `oldest_seq − 1` is accepted on a log whose every event was pruned.
         event_id:
           $ref: '#/components/schemas/Ulid'
           description: An event's CloudEvents `id`; the server acknowledges up to that event's `seq`. The event must still be in the log.
@@ -3194,7 +3209,7 @@ components:
               watch: []
               type: []
               source: [pypi, npm]
-            acked_seq: 0
+            acked_seq: 3050
             acked_at: null
             created_at: '2026-11-10T16:20:00.000Z'
             updated_at: '2026-11-10T16:20:00.000Z'
