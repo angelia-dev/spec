@@ -8,7 +8,7 @@ The REST API of an Angelia instance is specified in [`openapi/angelia.v1.yaml`](
 
 Each item names the option this draft takes, then the alternatives. Items marked **core** need a change or a decision in the [core repository](https://github.com/angelia-dev/angelia) as well.
 
-1. **Resource paths.** Taken: `/v1/watches`, `/v1/watches/{name}/versions`, `/v1/events`, `/v1/events/stream`, `/v1/events/{id}`, `/v1/sinks`, `/v1/subscriptions`, `/v1/deliveries`, `/v1/deliveries/{id}/replay`, `/v1/replays`, `/v1/plugins`, `/v1/plugins/{interface}/{kind}`. Alternatives: `/v1/plugins/{kind}` (a source and a sink could not share a kind name); a `/v1/deliveries/replay` action path instead of `/v1/replays`.
+1. **Resource paths.** Taken: `/v1/watches`, `/v1/watches/{name}/versions`, `/v1/events`, `/v1/events/stream`, `/v1/events/{id}`, `/v1/sinks`, `/v1/subscriptions`, `/v1/deliveries`, `/v1/deliveries/{id}/replay`, `/v1/replays`, `/v1/plugins`, `/v1/plugins/{interface}/{kind}`, `/v1/consumers`, `/v1/consumers/{name}/ack` (item 16). Alternatives: `/v1/plugins/{kind}` (a source and a sink could not share a kind name); a `/v1/deliveries/replay` action path instead of `/v1/replays`.
 2. **Names are the key, unique per resource type across owners (core).** Taken: watches, sinks and subscriptions are addressed by `name`, and a name is unique per resource type whoever manages the row. The core's migration 00004 has `UNIQUE (managed_by, name)`, so today a file row and an API row can share a name; the core must make the name unique per resource type before the API ships. Alternatives: address rows by `id` with `name` as a filter; add the owner to the path.
 3. **File-managed rows are read-only through the API.** Taken: rows loaded by `angelia serve --watches` have `managed_by: file`; the API reads them and refuses writes with `409 managed-by-file`. Alternative: let the API take rows over (the next file apply would then fight the API).
 4. **No references across owners.** Taken: an API subscription cannot use a file sink, and the reverse is impossible by construction; refused with `409 cross-owner-reference`. Reason: the file's apply refuses to remove a sink that a kept subscription uses, so removing that sink from the file would make the startup apply fail and the process exit. Alternative: allow it and make file apply dead-letter or detach API subscriptions.
@@ -23,13 +23,18 @@ Each item names the option this draft takes, then the alternatives. Items marked
 13. **Event filters.** Taken: `watch` (name or id), `type` (short types), `source` (source kinds), the keys of the subscription filter. Alternative: architecture.md's `kind=`, which is ambiguous between the event type and the source kind.
 14. **`EventRecord` wrapper.** Taken: `{seq, event, ref_event_id}`, with the CloudEvents envelope untouched in `event` and the yank reference of core ADR 0018 in `ref_event_id`. Alternatives: return bare envelopes with `seq` only in a header; drop `ref_event_id`.
 15. **SSE format.** Taken: `retry: 5000` first; `id` is the `seq`; `data` is the same `EventRecord` as the pull API; no `event` field; a `: keep-alive` comment after 15 idle seconds; an expired cursor is a `410` before the stream starts; bearer token in the header only; the token is checked again at least every 60 seconds and a revoked token closes the stream. Alternatives: `event: <type>` per message; a token in a query parameter so the browser `EventSource` works (it leaks into logs).
-16. **No consumer cursors or `ack` in v0.** Taken: clients keep their own `next_after`. Server-side durable cursors and the MCP `ack_event` are core #79 (Phase 2) and additive. Alternative: specify `/v1/consumers/{name}` now.
+16. **Consumer cursors and `ack` (core #79; maintainer decisions D1 to D5 of 2026-11-10, spec 0.5.0).** Until 0.5.0 clients kept their own `next_after`; a named consumer now keeps a durable cursor on the server for clients that cannot (agents without storage, the MCP tools `events_since` and `ack_event` of core #81). Clients may still keep their own `next_after`; `after` is unchanged.
+    1. *D1, shape.* Taken: a `/v1/consumers/{name}` resource (`PUT`, `GET`, `DELETE`, and `GET /v1/consumers`), `POST /v1/consumers/{name}/ack`, and a `consumer` query parameter on `GET /v1/events` and `GET /v1/events/stream`. `consumer` reads after the consumer's `acked_seq` with its stored `filter` (`ConsumerFilter`: the keys and values of the event filters `watch`, `type`, `source`), and is exclusive with `after`, `watch`, `type` and `source` (`400`); an unknown consumer gets `404`. Reading never acknowledges; on the stream, `Last-Event-ID` still takes precedence (item 15). Alternatives: only a `consumer` parameter that creates the consumer on first use (a typo creates a new consumer that starts from 0); a separate `GET /v1/consumers/{name}/events` (duplicates `EventPage` and the stream).
+    2. *D2, ack semantics.* Taken: a cursor commit, as a Kafka offset: the body is exactly one of `seq` and `event_id` (resolved to its `seq`), and `acked_seq` becomes `max(acked_seq, seq)`, so an ack is monotonic and idempotent and an older or repeated ack returns `200` with the consumer unchanged. A `seq` above the highest committed `seq`, or an `event_id` the log does not hold, gets `422 validation-failed`. Alternative: per-event acks with visibility timeouts, SQS-style (a row per consumer and event, redelivery timers).
+    3. *D3, scope.* Taken: `write` for `PUT`, `DELETE` and `ack`, `read` for the `GET`s and for reading events through a consumer. Alternatives: `read` for `ack` (any read token could move any consumer's cursor and make another agent skip events); a consumer owned by the token that created it (needs token identities, core #72; can be added later as an optional owner check).
+    4. *D4, retention.* Taken: retention ignores consumers. A consumer whose `acked_seq` is below the highest pruned `seq` gets `410 cursor-expired` with `oldest_seq`, as `after` does (item 12), and recovers by acknowledging `oldest_seq − 1`, accepting the gap. Alternative: keep the events above the lowest `acked_seq` (an abandoned consumer would stop pruning for good).
+    5. *D5, start position.* Taken: an optional `start` on create, `latest` (default: `acked_seq` is the highest committed `seq`) or `earliest` (`acked_seq` is `0`, the oldest event kept). `start` is ignored on an existing consumer, and no `PUT` moves `acked_seq`. Alternative: `earliest` by default (a new agent would receive 90 days of history by accident), or a required `start`.
 17. **Pagination of resource lists.** Taken: opaque `cursor` and `next_cursor` (`null` on the last page), `limit` default 100 and at most 500 (events: at most 1,000). Alternative: offset paging.
 18. **Problem `type` URIs.** Taken: `https://github.com/angelia-dev/spec/blob/main/docs/api.md#problem-<slug>`, which resolves to the [list below](#problem-types). Alternatives: `urn:angelia:problem:<slug>`; a URL on a project domain once there is one; a tagged URL instead of `main`.
 19. **Problem types and members.** Taken: the [list below](#problem-types), with the extension members `errors[{pointer, detail}]`, `required_scope` and `oldest_seq`. `about:blank` is never used.
 20. **No `429` in v0.** Taken: the API has no rate limit yet, so `429` is not specified. Alternative: add `429 rate-limited` with `Retry-After` now so clients handle it from the start.
 21. **Body size.** Taken: `413 payload-too-large` above 1 MiB. Alternative: another limit, or one per resource.
-22. **Scopes.** Taken: one scope per operation, ordered `read` < `write` < `admin`; `read` for every `GET`, `write` for watches, subscriptions and replay, `admin` for sink writes (a sink names secrets and decides where requests go). Alternatives: `write` for sinks too; unordered scopes.
+22. **Scopes.** Taken: one scope per operation, ordered `read` < `write` < `admin`; `read` for every `GET`, `write` for watches, subscriptions, replay, consumers and their acks, `admin` for sink writes (a sink names secrets and decides where requests go). Alternatives: `write` for sinks too; unordered scopes.
 23. **Auth before existence.** Taken: `401` and `403` are decided before `404`, so a token without the scope cannot probe which names exist.
 24. **No secret values in the v0 API.** Taken: the API accepts only references to environment variables (`*_env` keys), as the watch file does; it carries no secret value at all, so nothing is returned that could leak. Spectral rules forbid secret-named properties in responses and require `writeOnly` on any secret-named property. Write-only stored secrets came with core #75 as named secrets instead (items 33 to 37). Please confirm this meets the issue's criterion "secrets are write-only in the schema".
 25. **Allowlist of environment variables (core, new instance config key).** Taken: a `*_env` name set through the API must be listed in a new instance configuration key, proposed as `api.allowed_env` (a list of exact variable names, default empty: the API cannot set any `*_env` key, and sinks that need a secret come from the watch file). Names starting with `ANGELIA_` are always refused. Refused names get `422 env-not-allowed`. The key name, and whether it accepts patterns such as `CI_*`, are a public contract of the instance configuration. Alternatives: no allowlist (any API writer with `admin` could make the instance send any of its environment variables to a sink URL); a prefix such as `ANGELIA_SINK_` reserved for sink secrets.
@@ -39,7 +44,7 @@ Each item names the option this draft takes, then the alternatives. Items marked
 29. **Plugins list includes built-ins.** Taken: `GET /v1/plugins` lists every usable kind (`runtime: builtin` or `wasm`), so clients can discover valid `source` and `kind` values. Alternative: third-party plugins only.
 30. **Durations.** Taken: whole seconds are kept and fractions cut; a negative subscription `policy.cooldown` is clamped to `0` as in the watch file; a negative watch `policy.cooldown` is an error. Alternative: reject negative values everywhere.
 31. **Code-generation hint.** Taken: `EventRecord.event` carries `x-go-type: json.RawMessage` because oapi-codegen cannot generate a type from the external envelope schema. Alternative: bundle the schema into the document before generation.
-32. **Versioning and licence.** Taken: `/v1` in the path, `info.version` following spec releases (from 0.1.0; 0.2.0 adds stored secrets); `info.license` is `Apache-2.0 OR CC-BY-4.0`, as the README says for `openapi/`.
+32. **Versioning and licence.** Taken: `/v1` in the path, `info.version` following spec releases (from 0.1.0; 0.2.0 adds stored secrets; 0.5.0 adds consumers); `info.license` is `Apache-2.0 OR CC-BY-4.0`, as the README says for `openapi/`.
 33. **Stored secrets (core #75, ADR 0024).** Taken: `/v1/secrets/{name}` stores a value encrypted at rest under a name; `PUT` takes `value` (text) or `value_base64` (any bytes), at most 64 KiB, both `writeOnly`, and optional `hosts`; `GET` returns `name`, `hosts`, `key_id`, the times and `referenced_by`, never the value; `DELETE` is refused with `409 secret-in-use` while a reference exists. Every operation, reads included, needs `admin`: names, hosts and referrers map the instance's credentials. Alternatives: a per-sink `secrets` member (one value could not serve several sinks, and rotation would touch every sink); `read` for the metadata.
 34. **References are `*_ref` keys.** Taken: a configuration key whose name ends in `_ref` holds the name of a stored secret, as a key ending in `_env` holds the name of an environment variable (`secret_ref` for the webhook signing secret, at most one of `secret_ref` and `secret_env`). It is a name, never a value, and is returned as written. A reference to a secret that does not exist is accepted (deliveries fail before sending, retried, until it is stored). Every delivery attempt resolves references; values are not cached. Alternatives: a structured `{"$secret": name}` value; interpolation in strings.
 35. **Admin scope for references.** Taken: a write that adds, removes or changes a `*_ref` key needs `admin`, on any endpoint (watches and subscriptions too); a `write` token gets `403` with `required_scope: admin`. Writes that leave every `*_ref` unchanged keep the endpoint's scope. Alternative: an allowlist like `api.allowed_env` (it limits which secrets, not where they go).
@@ -76,6 +81,7 @@ Core follow-ups found while writing this specification (not decisions on the API
 | Subscriptions | `/v1/subscriptions`, `/v1/subscriptions/{name}` | `read` | `write` (`PUT`, `DELETE`) |
 | Deliveries | `/v1/deliveries`, `/v1/deliveries/{id}` | `read` | none |
 | Replay | `/v1/deliveries/{id}/replay`, `/v1/replays` (`POST`) | none | `write` |
+| Consumers (event cursors) | `/v1/consumers`, `/v1/consumers/{name}`, `/v1/consumers/{name}/ack` (`POST`) | `read` | `write` (`PUT`, `DELETE`, `ack`) |
 | Plugins (read-only) | `/v1/plugins`, `/v1/plugins/{interface}/{kind}` | `read` | none |
 
 `/healthz`, `/readyz` and `/metrics` are served on the same address but are not part of this API (see the core repository's [configuration.md](https://github.com/angelia-dev/angelia/blob/main/docs/configuration.md)).
@@ -84,7 +90,7 @@ Core follow-ups found while writing this specification (not decisions on the API
 
 - **Paths:** `/v1/` followed by plural resource nouns in lower case, with words joined by hyphens. Actions that are not a create, read, update or delete are a sub-resource with a verb (`/replay`) or a resource of their own (`/v1/replays`).
 - **Fields and query parameters:** `snake_case`, like the release event schema and the watch file. A resource uses the same key as the watch file wherever the watch file has one (`source`, `coordinates`, `interval`, `scheme`, `labels`, `policy`, `kind`, `config`, `sink`, `filter`, `template`).
-- **Keys:** watches, sinks and subscriptions are addressed by their `name` (pattern `^[a-z0-9][a-z0-9._-]{0,62}$`), unique per resource type whoever manages the resource. Each also has a response-only `id`, a ULID generated on creation and kept across updates. Events and deliveries are addressed by their ULID `id`. Where a parameter accepts either (`watch`, `subscription`), the two never overlap: names are lower case, ULIDs upper case.
+- **Keys:** watches, sinks, subscriptions, secrets and consumers are addressed by their `name` (pattern `^[a-z0-9][a-z0-9._-]{0,62}$`), unique per resource type whoever manages the resource. Each also has a response-only `id`, a ULID generated on creation and kept across updates. Events and deliveries are addressed by their ULID `id`. Where a parameter accepts either (`watch`, `subscription`), the two never overlap: names are lower case, ULIDs upper case.
 - **Event types** in filters are the short types of subscription filters (`release.published`, `release.yanked`, `release.prerelease`).
 - **Timestamps** are RFC 3339 in UTC with a `Z` suffix; the server always sends millisecond precision (`2026-10-30T17:00:02.512Z`) and accepts at most milliseconds.
 - **Durations** use Go syntax (`30m`, `72h`). The server keeps whole seconds and cuts any fraction.
@@ -106,7 +112,7 @@ Watches, sinks and subscriptions are written with `PUT /v1/<resource>/{name}`, a
 
 ## Pagination
 
-**Lists of resources** (`watches`, `versions`, `sinks`, `subscriptions`, `deliveries`, `plugins`) use opaque cursors:
+**Lists of resources** (`watches`, `versions`, `sinks`, `secrets`, `subscriptions`, `deliveries`, `plugins`, `consumers`) use opaque cursors:
 
 ```http
 GET /v1/watches?limit=100
@@ -129,10 +135,27 @@ The response is `{"items": [{"seq": 4182, "event": {...}, "ref_event_id": null},
 - `limit` defaults to 100 (at most 1,000).
 - Events older than the retention period (90 days by default) are pruned. A non-zero `after` below the highest pruned `seq` gets `410 cursor-expired` with `oldest_seq`; `after=0` always starts at the oldest event kept.
 
+**Consumers** keep the event cursor on the server (item 16). A consumer is created with `PUT /v1/consumers/{name}`, a stored `filter` (`watch`, `type`, `source`, as the query parameters) and an optional `start`; it is read with `consumer=` and moved only by an ack:
+
+```http
+PUT /v1/consumers/release-bot
+{"filter": {"watch": ["requests"], "type": ["release.published", "release.yanked"]}}
+
+GET /v1/events?consumer=release-bot&limit=100
+POST /v1/consumers/release-bot/ack
+{"seq": 4190}
+```
+
+- `GET /v1/events?consumer=c` returns exactly what `GET /v1/events?after=<acked_seq>` with the consumer's filter returns, `next_after` and `has_more` included. `limit` still applies. `consumer` cannot be combined with `after`, `watch`, `type` or `source` (`400`); an unknown consumer gets `404`.
+- Reading never acknowledges. After processing a page, the client acknowledges its `next_after` (which also skips the events the filter left out) or the `seq` or `event_id` of the last event it handled. An ack sets `acked_seq` to `max(acked_seq, seq)`: repeating it, or acknowledging an older position, changes nothing. A client that crashes before acknowledging reads the same events again (at least once).
+- `start` applies on create only: `latest` (the default) starts at the highest committed `seq`, `earliest` at `0`, the oldest event kept. A `PUT` of an existing consumer replaces its filter and never moves `acked_seq`.
+- Retention does not wait for consumers. A consumer whose `acked_seq` is below the highest pruned `seq` gets `410 cursor-expired` with `oldest_seq`; acknowledging `oldest_seq − 1` resumes it after the gap. A consumer at `acked_seq` `0` never expires, as `after=0` does not.
+- One consumer is meant for one reader: two readers of the same consumer receive the same events.
+
 **The event stream** `GET /v1/events/stream` takes the same filters and sends [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html):
 
 - The stream starts with `retry: 5000`. Each message has `id` (the `seq`) and `data` (the same `EventRecord` as the pull API, one line of JSON), and no `event` field.
-- A reconnecting client sends `Last-Event-ID`, which takes precedence over `after`. An expired cursor gets a `410 cursor-expired` problem response before any stream starts.
+- A reconnecting client sends `Last-Event-ID`, which takes precedence over `after` and over a consumer's `acked_seq`. With `consumer=`, the stream starts after the consumer's `acked_seq` with its stored filter and never moves its cursor. An expired cursor gets a `410 cursor-expired` problem response before any stream starts.
 - A `: keep-alive` comment is sent when the stream has been idle for 15 seconds.
 - The token goes in the `Authorization` header. The browser `EventSource` API cannot set headers, so it cannot use this endpoint; use a fetch-based SSE client. The server checks the token again at least every 60 seconds and closes the stream once it is revoked.
 
@@ -162,7 +185,7 @@ Each `type` is `https://github.com/angelia-dev/spec/blob/main/docs/api.md#proble
 
 #### Problem: bad-request
 
-`400`. Malformed JSON, an unknown or invalid query parameter, or a cursor the server did not issue.
+`400`. Malformed JSON, an unknown or invalid query parameter, a cursor the server did not issue, or `consumer` combined with `after`, `watch`, `type` or `source`.
 
 #### Problem: unauthorized
 
@@ -198,7 +221,7 @@ Each `type` is `https://github.com/angelia-dev/spec/blob/main/docs/api.md#proble
 
 #### Problem: cursor-expired
 
-`410`. The event cursor points into pruned events; `oldest_seq` is the oldest event kept.
+`410`. The event cursor (`after`, `Last-Event-ID` or a consumer's `acked_seq`) points into pruned events; `oldest_seq` is the oldest event kept.
 
 #### Problem: payload-too-large
 
@@ -239,7 +262,7 @@ Every request carries an API token: `Authorization: Bearer <token>`. A token has
 | Scope | Allows |
 | --- | --- |
 | `read` | every `GET`, including the event stream; sink URLs are cut to `scheme://host` |
-| `write` | `PUT` and `DELETE` of watches and subscriptions, replay of deliveries |
+| `write` | `PUT` and `DELETE` of watches, subscriptions and consumers, replay of deliveries, consumer acks |
 | `admin` | `PUT` and `DELETE` of sinks, which name secrets and decide where the instance sends requests; full sink URLs; every operation on `/v1/secrets`; any write that adds, removes or changes a `*_ref` key |
 
 Each operation in the specification declares the scope it needs in its `security` requirement (OpenAPI 3.1 allows role names for a non-OAuth scheme). How tokens are created, stored and revoked is the core repository's API tokens story; OIDC may come later.
