@@ -13,12 +13,12 @@ Part of [Angelia](https://github.com/angelia-dev), the self-hosted release event
 - `examples/invalid/<type>/v<major>/`: examples that must fail validation against their schema.
 - `openapi/angelia.v1.yaml`: OpenAPI 3.1 specification of the REST API (`/v1`). Conventions: [docs/api.md](docs/api.md).
 - `.spectral.yaml`: the Spectral ruleset the OpenAPI specification must pass; CI runs it on each pull request and push to `main`.
-- `scripts/validate-examples.sh`: validates every example and every schema. CI runs it on each pull request and push to `main`.
+- `scripts/validate-examples.sh`: validates every example outside `examples/mcp/` and every schema. CI runs it on each pull request and push to `main`.
 - `webhooks/v1/vectors.json`: Standard Webhooks test vectors for Angelia's webhook sink, described by `schemas/webhooks/v1.json`. See [Webhook test vectors](#webhook-test-vectors).
 - `scripts/check-webhook-vectors.py`: recomputes every signature and expected result in the vectors; `scripts/validate-examples.sh` runs it.
 - `mcp/tools.v1.json`: the MCP tool contract, exactly what `tools/list` returns. Decisions and rules: [docs/mcp.md](docs/mcp.md).
 - `examples/mcp/v1/<valid|invalid>/<tool>/`: example tool arguments that must (or must not) validate against the tool's `inputSchema`.
-- `scripts/check-mcp-tools.py`: checks the MCP tool contract (schemas compile as 2020-12, unique names, required annotations, the untrusted-data sentence, fields that mirror the OpenAPI document) and its example arguments. CI runs it.
+- `scripts/check-mcp-tools.py`: checks the MCP tool contract (schemas compile as 2020-12, unique names, annotation hints, the untrusted-data sentence, fields that mirror the OpenAPI document) and its example arguments. CI runs it.
 - `scripts/check-go-stubs.sh`: generates Go server stubs from the OpenAPI specification with oapi-codegen and compiles them in a throwaway module (nothing is written to the repository). CI runs it too.
 - `docs/`: per-field documentation, API conventions and accepted proposals.
 
