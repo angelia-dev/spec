@@ -1,0 +1,1 @@
+{"name": "kubernetes", "source": "github-release", "coordinates": {"repo": "kubernetes/kubernetes"}, "interval": "6h", "scheme": "semver", "labels": {"team": "platform"}, "policy": {"prerelease": "include", "include": [], "exclude": ["-alpha"], "constraint": ">=1.30", "bump": ["major", "minor"], "cooldown": "72h", "baseline": true}}

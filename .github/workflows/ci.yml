@@ -34,6 +34,10 @@ jobs:
       - name: Validate schemas and examples
         run: scripts/validate-examples.sh
 
+      # jsonschema and ruamel.yaml come with check-jsonschema.
+      - name: Check the MCP tool contract and its examples
+        run: scripts/check-mcp-tools.py
+
   markdownlint:
     name: Markdown lint
     runs-on: ubuntu-24.04
