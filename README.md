@@ -13,9 +13,12 @@ Part of [Angelia](https://github.com/angelia-dev), the self-hosted release event
 - `examples/invalid/<type>/v<major>/`: examples that must fail validation against their schema.
 - `openapi/angelia.v1.yaml`: OpenAPI 3.1 specification of the REST API (`/v1`). Conventions: [docs/api.md](docs/api.md).
 - `.spectral.yaml`: the Spectral ruleset the OpenAPI specification must pass; CI runs it on each pull request and push to `main`.
-- `scripts/validate-examples.sh`: validates every example and every schema. CI runs it on each pull request and push to `main`.
+- `scripts/validate-examples.sh`: validates every example outside `examples/mcp/` and every schema. CI runs it on each pull request and push to `main`.
 - `webhooks/v1/vectors.json`: Standard Webhooks test vectors for Angelia's webhook sink, described by `schemas/webhooks/v1.json`. See [Webhook test vectors](#webhook-test-vectors).
 - `scripts/check-webhook-vectors.py`: recomputes every signature and expected result in the vectors; `scripts/validate-examples.sh` runs it.
+- `mcp/tools.v1.json`: the MCP tool contract, exactly what `tools/list` returns. Decisions and rules: [docs/mcp.md](docs/mcp.md).
+- `examples/mcp/v1/<valid|invalid>/<tool>/`: example tool arguments that must (or must not) validate against the tool's `inputSchema`.
+- `scripts/check-mcp-tools.py`: checks the MCP tool contract (schemas compile as 2020-12, unique names, annotation hints, the untrusted-data sentence, fields that mirror the OpenAPI document) and its example arguments. CI runs it.
 - `scripts/check-go-stubs.sh`: generates Go server stubs from the OpenAPI specification with oapi-codegen and compiles them in a throwaway module (nothing is written to the repository). CI runs it too.
 - `docs/`: per-field documentation, API conventions and accepted proposals.
 
@@ -44,6 +47,16 @@ Validate locally:
 ```sh
 python -m pip install "check-jsonschema==0.38.2"
 scripts/validate-examples.sh
+```
+
+## MCP tools
+
+[`mcp/tools.v1.json`](mcp/tools.v1.json) is the contract of Angelia's MCP server (draft), the agent surface: the tools `list_watches`, `latest_version`, `events_since`, `add_watch` and `ack_event`, with their input and output schemas and annotations, exactly as `tools/list` returns them. Each tool is a thin layer over the REST API with the caller's token. Decisions, scopes, errors and versioning: [docs/mcp.md](docs/mcp.md).
+
+Check locally (needs check-jsonschema, as above):
+
+```sh
+scripts/check-mcp-tools.py
 ```
 
 ## Webhook test vectors
@@ -96,6 +109,6 @@ The accepted proposal changes things outside this repository. Each needs an issu
 This repository is dual-licensed:
 
 - **Code** (scripts, CI configuration and tooling) is licensed under [Apache-2.0](LICENSE).
-- **Schemas, examples and test vectors** (`schemas/`, `examples/`, `webhooks/`, and the OpenAPI specification under `openapi/`) are also licensed under [CC-BY-4.0](LICENSE-SCHEMAS). You may use them under either license.
+- **Schemas, examples and test vectors** (`schemas/`, `examples/`, `webhooks/`, the OpenAPI specification under `openapi/`, and the MCP tool contract under `mcp/`) are also licensed under [CC-BY-4.0](LICENSE-SCHEMAS). You may use them under either license.
 
 The full CC-BY-4.0 legal code is in [LICENSE-SCHEMAS](LICENSE-SCHEMAS). Official text: <https://creativecommons.org/licenses/by/4.0/legalcode>.
