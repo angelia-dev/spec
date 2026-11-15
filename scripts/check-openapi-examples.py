@@ -12,7 +12,8 @@ Fails if:
   - a schema in SCHEMAS has no valid or no invalid example, or a directory names a schema that
     is not in SCHEMAS;
   - an example is not a .json file or is not parseable JSON;
-  - a valid example's `token` member is not the token of its own `id` (`ang_<id>_...`);
+  - a valid example's `token` member is not the token of its own `id` (`ang_<id>_...`), or its
+    last 7 characters are not the check value (CRC-32 of the rest, big-endian, base32, lower case)
   - an inline example of the token schemas in the document (components.examples) does not
     validate against its schema, or the document's `TokenCreated` example uses a token that does
     not belong to its `id`.
@@ -24,9 +25,11 @@ Needs the jsonschema and ruamel.yaml packages, which check-jsonschema (installed
 scripts/validate-examples.sh) depends on.
 """
 
+import base64
 import json
 import pathlib
 import sys
+import zlib
 
 from jsonschema import Draft202012Validator
 from ruamel.yaml import YAML
@@ -57,8 +60,15 @@ def validator(doc, name):
 
 def check_token_belongs_to_id(where, value):
     token = value.get("token") if isinstance(value, dict) else None
-    if token is not None and not token.startswith(f"ang_{value.get('id')}_"):
+    if token is None:
+        return
+    if not token.startswith(f"ang_{value.get('id')}_"):
         fail(f"{where}: token does not carry the member id {value.get('id')!r}")
+    # check = CRC-32 (IEEE) of everything before it, 4 big-endian bytes, lower-case base32, no padding.
+    body, check = token[:-7], token[-7:]
+    want = base64.b32encode(zlib.crc32(body.encode("ascii")).to_bytes(4, "big")).decode().rstrip("=").lower()
+    if check != want:
+        fail(f"{where}: token check is {check!r}, want {want!r}")
 
 
 def main():

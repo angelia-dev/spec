@@ -232,14 +232,38 @@ rules:
         match: '^#/components/schemas/TokenCreated$'
 
   angelia-token-created-no-other-secret:
-    description: The createToken response schema has no secret-named property other than the member token.
+    description: The top level of the createToken response schema has no secret-named property other than the member token.
     severity: error
-    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].schema..properties
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].schema.allOf[*].properties
     then:
       field: '@key'
       function: pattern
       functionOptions:
         notMatch: '^(?!idempotency_key$|token$)(.*_)?(secret|token|password|passwd|key)s?$'
+
+  angelia-token-created-no-nested-secret:
+    description: Nothing nested in the createToken response schema has a secret-named property, token included.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].schema.allOf[*].properties[*]..properties
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        notMatch: '^(?!idempotency_key$)(.*_)?(secret|token|password|passwd|key)s?$'
+
+  angelia-token-created-no-other-secret-example:
+    description: The createToken response examples have no secret-named member other than the top-level token.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].examples[*].value[?(@property && @property.match && @property !== 'idempotency_key' && @property !== 'token' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
+    then:
+      function: undefined
+
+  angelia-token-created-no-nested-secret-example:
+    description: Nothing nested in a createToken response example has a secret-named member, token included.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].examples[*].value[*]..[?(@property && @property.match && @property !== 'idempotency_key' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
+    then:
+      function: undefined
 
   angelia-token-member-schema:
     description: No schema other than TokenCreated has a token member (a request body, a response, or a nested object).

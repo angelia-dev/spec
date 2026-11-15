@@ -1627,6 +1627,8 @@ components:
         A token looks like `ang_<id>_<secret><check>`, 90 characters: the prefix `ang_`, the
         token's 26-character ULID (its public `id`), an underscore, 52 characters of random
         secret and a 7-character CRC-32 check, the last two in lower-case base32 (`a-z2-7`).
+        check = CRC-32 (IEEE) of the ASCII bytes `ang_<id>_<secret>`, as 4 big-endian bytes,
+        lower-case RFC 4648 base32 without padding.
         Scanners and log redaction can match
         `(?:^|[^A-Za-z0-9_])(ang_[0-7][0-9A-HJKMNP-TV-Z]{25}_[a-z2-7]{59})(?:$|[^A-Za-z0-9_])`.
         Tokens are created with `POST /v1/tokens` (or `angelia token create`); the token is
@@ -1953,7 +1955,7 @@ components:
 
   schemas:
     Name:
-      description: The stable key of a watch, sink, subscription, secret or consumer (the first three as in the watch file). Unique per resource type, whoever manages the resource.
+      description: The stable key of a watch, sink, subscription, secret or consumer (the first three as in the watch file), or the label of an API token. Unique per resource type, whoever manages the resource (for tokens, among active tokens).
       type: string
       pattern: '^[a-z0-9][a-z0-9._-]{0,62}$'
     Ulid:
@@ -3625,7 +3627,7 @@ components:
         revoked_at: null
         revoked_by: null
     TokenPage:
-      summary: A page with a bootstrap token, revoked, and an active read token
+      summary: A page with `include_revoked=true`, a revoked bootstrap token and an active read token
       value:
         items:
           - id: 01JCZ7P0N4D8E1B5XJ2Q6S3TGH
@@ -3642,7 +3644,7 @@ components:
             scope: read
             created_at: '2026-11-15T10:00:00.000Z'
             created_by: 01JCZ7P0N4D8E1B5XJ2Q6S3TGH
-            expires_at: '2027-02-13T10:00:00.000Z'
+            expires_at: null
             last_used_at: '2026-11-15T10:25:00.000Z'
             revoked_at: null
             revoked_by: null
