@@ -8,7 +8,7 @@ The REST API of an Angelia instance is specified in [`openapi/angelia.v1.yaml`](
 
 Each item names the option this draft takes, then the alternatives. Items marked **core** need a change or a decision in the [core repository](https://github.com/angelia-dev/angelia) as well.
 
-1. **Resource paths.** Taken: `/v1/watches`, `/v1/watches/{name}/versions`, `/v1/events`, `/v1/events/stream`, `/v1/events/{id}`, `/v1/sinks`, `/v1/subscriptions`, `/v1/deliveries`, `/v1/deliveries/{id}/replay`, `/v1/replays`, `/v1/plugins`, `/v1/plugins/{interface}/{kind}`, `/v1/consumers`, `/v1/consumers/{name}/ack` (item 16). Alternatives: `/v1/plugins/{kind}` (a source and a sink could not share a kind name); a `/v1/deliveries/replay` action path instead of `/v1/replays`.
+1. **Resource paths.** Taken: `/v1/watches`, `/v1/watches/{name}/versions`, `/v1/events`, `/v1/events/stream`, `/v1/events/{id}`, `/v1/sinks`, `/v1/subscriptions`, `/v1/deliveries`, `/v1/deliveries/{id}/replay`, `/v1/replays`, `/v1/plugins`, `/v1/plugins/{interface}/{kind}`, `/v1/consumers`, `/v1/consumers/{name}/ack` (item 16), `/v1/tokens`, `/v1/tokens/{id}` (items 41 to 43). Alternatives: `/v1/plugins/{kind}` (a source and a sink could not share a kind name); a `/v1/deliveries/replay` action path instead of `/v1/replays`.
 2. **Names are the key, unique per resource type across owners (core).** Taken: watches, sinks and subscriptions are addressed by `name`, and a name is unique per resource type whoever manages the row. The core's migration 00004 has `UNIQUE (managed_by, name)`, so today a file row and an API row can share a name; the core must make the name unique per resource type before the API ships. Alternatives: address rows by `id` with `name` as a filter; add the owner to the path.
 3. **File-managed rows are read-only through the API.** Taken: rows loaded by `angelia serve --watches` have `managed_by: file`; the API reads them and refuses writes with `409 managed-by-file`. Alternative: let the API take rows over (the next file apply would then fight the API).
 4. **No references across owners.** Taken: an API subscription cannot use a file sink, and the reverse is impossible by construction; refused with `409 cross-owner-reference`. Reason: the file's apply refuses to remove a sink that a kept subscription uses, so removing that sink from the file would make the startup apply fail and the process exit. Alternative: allow it and make file apply dead-letter or detach API subscriptions.
@@ -44,7 +44,7 @@ Each item names the option this draft takes, then the alternatives. Items marked
 29. **Plugins list includes built-ins.** Taken: `GET /v1/plugins` lists every usable kind (`runtime: builtin` or `wasm`), so clients can discover valid `source` and `kind` values. Alternative: third-party plugins only.
 30. **Durations.** Taken: whole seconds are kept and fractions cut; a negative subscription `policy.cooldown` is clamped to `0` as in the watch file; a negative watch `policy.cooldown` is an error. Alternative: reject negative values everywhere.
 31. **Code-generation hint.** Taken: `EventRecord.event` carries `x-go-type: json.RawMessage` because oapi-codegen cannot generate a type from the external envelope schema. Alternative: bundle the schema into the document before generation.
-32. **Versioning and licence.** Taken: `/v1` in the path, `info.version` following spec releases (from 0.1.0; 0.2.0 adds stored secrets; 0.5.0 adds consumers; 0.6.0 adds no change to this document, only the MCP tool contract of [docs/mcp.md](mcp.md)); `info.license` is `Apache-2.0 OR CC-BY-4.0`, as the README says for `openapi/`.
+32. **Versioning and licence.** Taken: `/v1` in the path, `info.version` following spec releases (from 0.1.0; 0.2.0 adds stored secrets; 0.5.0 adds consumers; 0.6.0 adds no change to this document, only the MCP tool contract of [docs/mcp.md](mcp.md); 0.7.0 adds API tokens); `info.license` is `Apache-2.0 OR CC-BY-4.0`, as the README says for `openapi/`.
 33. **Stored secrets (core #75, ADR 0024).** Taken: `/v1/secrets/{name}` stores a value encrypted at rest under a name; `PUT` takes `value` (text) or `value_base64` (any bytes), at most 64 KiB, both `writeOnly`, and optional `hosts`; `GET` returns `name`, `hosts`, `key_id`, the times and `referenced_by`, never the value; `DELETE` is refused with `409 secret-in-use` while a reference exists. Every operation, reads included, needs `admin`: names, hosts and referrers map the instance's credentials. Alternatives: a per-sink `secrets` member (one value could not serve several sinks, and rotation would touch every sink); `read` for the metadata.
 34. **References are `*_ref` keys.** Taken: a configuration key whose name ends in `_ref` holds the name of a stored secret, as a key ending in `_env` holds the name of an environment variable (`secret_ref` for the webhook signing secret, at most one of `secret_ref` and `secret_env`). It is a name, never a value, and is returned as written. A reference to a secret that does not exist is accepted (deliveries fail before sending, retried, until it is stored). Every delivery attempt resolves references; values are not cached. Alternatives: a structured `{"$secret": name}` value; interpolation in strings.
 35. **Admin scope for references.** Taken: a write that adds, removes or changes a `*_ref` key needs `admin`, on any endpoint (watches and subscriptions too); a `write` token gets `403` with `required_scope: admin`. Writes that leave every `*_ref` unchanged keep the endpoint's scope. Alternative: an allowlist like `api.allowed_env` (it limits which secrets, not where they go).
@@ -61,6 +61,16 @@ Each item names the option this draft takes, then the alternatives. Items marked
 
 39. **`shoutrrr` sink configuration (core #120, ADR 0026; maintainer decision of 2026-11-07, spec 0.4.0).** Taken: `ShoutrrrSinkConfig` in `x-angelia-kind-config`. It has exactly one of `url_ref` and `url_env`, whose value is the **whole** shoutrrr service URL; an optional `service` (`slack`, `discord`, `telegram`, `ntfy`, `gotify`, `matrix`) that the URL's scheme must equal; and `timeout` (`1s` to `2m`, default `10s`). The reference keys carry a new annotation, `x-angelia-secret-destination: true`: the resolved value of the reference is the destination. At every delivery the server derives the HTTP origins from it and checks each one (`https`, or `http` only for a host in `http.allow_http_hosts`; the SSRF guard; the secret's `hosts`, which stay optional), then pins every request to them. A failure of these checks is retried. Only the six services above are allowed, matrix only in its access-token form, and `skiptlsverify=yes` is refused. This is the whole-URL secret that core ADR 0024 §1 left open. The host is not visible in the configuration, so the secret's `hosts`, the `service` key and `last_error` (service and origin only) show it instead. Alternatives: a base URL plus `token_ref` (per-service config shapes mirroring shoutrrr's URL formats; rejected in ADR 0026); a required `service` (it would repeat the scheme in every sink).
 40. **Named source instances (core #205; 2026-11-07, spec 0.4.1).** Taken: a watch's `source` may be a registered source kind or the name of a source instance configured on the server (`sources.<name>` with `kind:`). Events always carry the base kind in `data.source`, so the `source` filter on events matches kinds while on watches it matches the watch's `source`. Description-only change; the `Kind` pattern is unchanged. Alternative: a separate `instance` field on watches (an additive field, rejected as unnecessary since the name already fits `Kind`).
+
+41. **API token format (core #72, ADR 0030 T1 and T8; maintainer decision of 2026-11-15, spec 0.7.0).** Taken: a token is `ang_<id>_<secret><check>`, 90 characters: the prefix `ang_`, the token's ULID (its public `id`, 26 characters, upper case), `_`, 52 characters of random secret and a 7-character CRC-32 check, both in lower-case base32 (`a-z2-7`). Scanners and redaction can rely on this regular expression (no `\b`: `_` is a word character, so `\b` would not delimit the token from a neighbouring identifier); group 1 is the token:
+
+    ```text
+    (?:^|[^A-Za-z0-9_])(ang_[0-7][0-9A-HJKMNP-TV-Z]{25}_[a-z2-7]{59})(?:$|[^A-Za-z0-9_])
+    ```
+
+    A later format gets a new prefix (for example `ang2_`), so the format needs no version member. The check filters typos and scanner noise only: it is public and unkeyed, so it is no defence against guessing. The secret appears in exactly one place, the member `token` of the `201` response of `POST /v1/tokens` (`TokenCreated`); `GET` never returns it. That makes `TokenCreated.token` the one secret-named response member of the API: the Spectral rules allow it on that schema only, require it to be `readOnly`, and forbid a `token` member in every other schema, response and example. Alternatives: `angelia_` as the prefix (longer for no gain); no checksum.
+42. **Admin scope for token metadata (core #72, ADR 0030 T5).** Taken: all four operations (`listTokens`, `createToken`, `getToken`, `revokeToken`) need `admin`, reading included, because the list shows who can do what (as for secrets). Tokens are addressed by `id` (a ULID), not by `name`: a `name` is a label, unique among active tokens only, and a revoked token's name can be reused. No MCP tool manages tokens: an agent with an admin token should not be able to mint more tokens through a tool whose call the user may not inspect. Alternative: `read` for metadata (any read token would see every other token's name and scope).
+43. **Revocation, expiry and last use (core #72, ADR 0030 T6).** Taken: `DELETE /v1/tokens/{id}` revokes (`204`, and `204` again for a token that is already revoked). It takes effect on the next request on any replica; an open event stream fails at its next re-check, at most 60 seconds later (item 15); MCP over HTTP forwards the header on every call, so it fails at once. A token may revoke itself, and revoking the last active admin token is allowed (an instance-side command creates a new one). `expires_at` is optional, set at creation, and a token has no expiry by default; an expired token is `401` exactly like an unknown one, and stays listed. `last_used_at` is written at most once per token per 5 minutes, so it is accurate to about 5 minutes and a crash can lose the last interval. Alternatives: a default expiry (such as 365 days); a cache with a TTL (a revocation could then take up to the TTL to apply).
 
 Core follow-ups found while writing this specification (not decisions on the API):
 
@@ -83,6 +93,7 @@ Core follow-ups found while writing this specification (not decisions on the API
 | Replay | `/v1/deliveries/{id}/replay`, `/v1/replays` (`POST`) | none | `write` |
 | Consumers (event cursors) | `/v1/consumers`, `/v1/consumers/{name}`, `/v1/consumers/{name}/ack` (`POST`) | `read` | `write` (`PUT`, `DELETE`, `ack`) |
 | Plugins (read-only) | `/v1/plugins`, `/v1/plugins/{interface}/{kind}` | `read` | none |
+| Tokens (secret returned once) | `/v1/tokens` (`GET`, `POST`), `/v1/tokens/{id}` (`GET`, `DELETE`) | `admin` (metadata only) | `admin` (`POST` creates, `DELETE` revokes) |
 
 `/healthz`, `/readyz` and `/metrics` are served on the same address but are not part of this API (see the core repository's [configuration.md](https://github.com/angelia-dev/angelia/blob/main/docs/configuration.md)).
 
@@ -90,7 +101,7 @@ Core follow-ups found while writing this specification (not decisions on the API
 
 - **Paths:** `/v1/` followed by plural resource nouns in lower case, with words joined by hyphens. Actions that are not a create, read, update or delete are a sub-resource with a verb (`/replay`) or a resource of their own (`/v1/replays`).
 - **Fields and query parameters:** `snake_case`, like the release event schema and the watch file. A resource uses the same key as the watch file wherever the watch file has one (`source`, `coordinates`, `interval`, `scheme`, `labels`, `policy`, `kind`, `config`, `sink`, `filter`, `template`).
-- **Keys:** watches, sinks, subscriptions, secrets and consumers are addressed by their `name` (pattern `^[a-z0-9][a-z0-9._-]{0,62}$`), unique per resource type whoever manages the resource. Each also has a response-only `id`, a ULID generated on creation and kept across updates. Events and deliveries are addressed by their ULID `id`. Where a parameter accepts either (`watch`, `subscription`), the two never overlap: names are lower case, ULIDs upper case.
+- **Keys:** watches, sinks, subscriptions, secrets and consumers are addressed by their `name` (pattern `^[a-z0-9][a-z0-9._-]{0,62}$`), unique per resource type whoever manages the resource. Each also has a response-only `id`, a ULID generated on creation and kept across updates. Events, deliveries and API tokens are addressed by their ULID `id` (a token also has a `name`, a label that is unique among active tokens and is not a key). Where a parameter accepts either (`watch`, `subscription`), the two never overlap: names are lower case, ULIDs upper case.
 - **Event types** in filters are the short types of subscription filters (`release.published`, `release.yanked`, `release.prerelease`).
 - **Timestamps** are RFC 3339 in UTC with a `Z` suffix; the server always sends millisecond precision (`2026-10-30T17:00:02.512Z`) and accepts at most milliseconds.
 - **Durations** use Go syntax (`30m`, `72h`). The server keeps whole seconds and cuts any fraction.
@@ -112,7 +123,7 @@ Watches, sinks and subscriptions are written with `PUT /v1/<resource>/{name}`, a
 
 ## Pagination
 
-**Lists of resources** (`watches`, `versions`, `sinks`, `secrets`, `subscriptions`, `deliveries`, `plugins`, `consumers`) use opaque cursors:
+**Lists of resources** (`watches`, `versions`, `sinks`, `secrets`, `subscriptions`, `deliveries`, `plugins`, `consumers`, `tokens`) use opaque cursors:
 
 ```http
 GET /v1/watches?limit=100
@@ -265,9 +276,19 @@ Every request carries an API token: `Authorization: Bearer <token>`. A token has
 | --- | --- |
 | `read` | every `GET`, including the event stream; sink URLs are cut to `scheme://host` |
 | `write` | `PUT` and `DELETE` of watches, subscriptions and consumers, replay of deliveries, consumer acks |
-| `admin` | `PUT` and `DELETE` of sinks, which name secrets and decide where the instance sends requests; full sink URLs; every operation on `/v1/secrets`; any write that adds, removes or changes a `*_ref` key |
+| `admin` | `PUT` and `DELETE` of sinks, which name secrets and decide where the instance sends requests; full sink URLs; every operation on `/v1/secrets`; every operation on `/v1/tokens`; any write that adds, removes or changes a `*_ref` key |
 
-Each operation in the specification declares the scope it needs in its `security` requirement (OpenAPI 3.1 allows role names for a non-OAuth scheme). How tokens are created, stored and revoked is the core repository's API tokens story; OIDC may come later.
+Each operation in the specification declares the scope it needs in its `security` requirement (OpenAPI 3.1 allows role names for a non-OAuth scheme). Tokens have the format of item 41, are created and revoked through `/v1/tokens` (items 42 and 43; [API tokens](#api-tokens)), and are stored hashed, as [core ADR 0030](https://github.com/angelia-dev/angelia/blob/main/docs/adr/0030-api-tokens.md) decides; OIDC may come later.
+
+## API tokens
+
+Tokens are managed through `/v1/tokens`, all operations `admin` ([core ADR 0030](https://github.com/angelia-dev/angelia/blob/main/docs/adr/0030-api-tokens.md), items 41 to 43).
+
+- `POST /v1/tokens` takes `name`, `scope` and an optional `expires_at` (in the future) and returns `201` with the token's metadata and `token`, the token itself. This is the only response that ever carries it: store it now, the server keeps a hash only. A `name` already used by an active token is `422 validation-failed` with `errors[{pointer: "/name"}]`; there is no new problem type.
+- `GET /v1/tokens` lists tokens in ascending `id` order with the usual cursor paging; revoked tokens are left out unless `include_revoked=true`. `GET /v1/tokens/{id}` returns one token, revoked or not. An unknown id is `404`, after authentication as usual (item 23).
+- `DELETE /v1/tokens/{id}` revokes: `204`, also for a token that is already revoked. The row stays, so an id is never reused, and the name is free again.
+- `created_by` and `revoked_by` are a token id, or `bootstrap` (the token stored from the bootstrap file) or `local` (a token created or revoked by an instance-side command). `expires_at`, `last_used_at`, `revoked_at` and `revoked_by` are `null` when they have no value. `last_used_at` is accurate to about 5 minutes.
+- No MCP tool manages tokens: the tools of [docs/mcp.md](mcp.md) are unchanged.
 
 ## Secrets
 
@@ -297,7 +318,7 @@ CI checks that the stubs generate and compile: [`scripts/check-go-stubs.sh`](../
 
 ## Lint
 
-CI lints the specification with [Spectral](https://github.com/stoplightio/spectral) and the ruleset in [`.spectral.yaml`](../.spectral.yaml): `spectral:oas` plus rules for the conventions above (paths under `/v1`, `snake_case` properties, one scope per operation, problem details for errors, no secret-named property in a response schema or example and `writeOnly` on any secret-named property, `writeOnly` on the stored-secret members `value` and `value_base64` and neither of them in any response schema or example, an example for every request, response and parameter). Run it locally:
+CI lints the specification with [Spectral](https://github.com/stoplightio/spectral) and the ruleset in [`.spectral.yaml`](../.spectral.yaml): `spectral:oas` plus rules for the conventions above (paths under `/v1`, `snake_case` properties, one scope per operation, problem details for errors, no secret-named property in a response schema or example and `writeOnly` on any secret-named property (the one exception is `TokenCreated.token`, item 41: it must be `readOnly`, and no other schema, response or example may have a `token` member), `writeOnly` on the stored-secret members `value` and `value_base64` and neither of them in any response schema or example, an example for every request, response and parameter). Run it locally:
 
 ```sh
 npx --yes @stoplight/spectral-cli@6.17.0 lint --fail-severity=hint openapi/angelia.v1.yaml

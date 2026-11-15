@@ -38,6 +38,9 @@ jobs:
       - name: Check the MCP tool contract and its examples
         run: scripts/check-mcp-tools.py
 
+      - name: Check the API token schemas and their examples
+        run: scripts/check-openapi-examples.py
+
   markdownlint:
     name: Markdown lint
     runs-on: ubuntu-24.04

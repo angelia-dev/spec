@@ -1,0 +1,12 @@
+{
+  "id": "01JCZ8W3T6Q9N2H4K7M5R0V8XA",
+  "name": "grafana",
+  "scope": "read",
+  "created_at": "2026-11-15T10:00:00.000Z",
+  "created_by": "01JCZ7P0N4D8E1B5XJ2Q6S3TGH",
+  "expires_at": null,
+  "last_used_at": null,
+  "revoked_at": null,
+  "revoked_by": null,
+  "token": null
+}
