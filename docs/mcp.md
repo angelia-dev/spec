@@ -84,7 +84,7 @@ Each `type` is `https://github.com/angelia-dev/spec/blob/main/docs/mcp.md#proble
 - Descriptions may be reworded within v1, but the untrusted-data sentence stays.
 - One exception to "new optional input properties are additive": `ack_event` expresses "exactly one of `seq` and `event_id`" as exactly two properties (`minProperties` and `maxProperties` 2). Adding an optional input to `ack_event` therefore also replaces that rule with `dependentSchemas` (each of `seq` and `event_id` excluding the other) and a required choice, in the same change.
 - The tools are ordered by name, ascending, as `tools/list` returns them. Key order and whitespace in the file carry no meaning.
-- While the spec repository is 0.x, the rules above are a goal, not a promise: any 0.x minor release may still break v1 before spec 1.0.0 freezes it. The contract was first published in spec 0.6.0 (the OpenAPI document's `info.version`, which follows spec releases, is 0.6.0 although the document itself did not change).
+- While the spec repository is 0.x, the rules above are a goal, not a promise: any 0.x minor release may still break v1 before spec 1.0.0 freezes it. The contract was first published in spec 0.6.0 (the OpenAPI document's `info.version`, which follows spec releases, was 0.6.0 although the document itself did not change).
 
 ## Validation
 

@@ -111,11 +111,15 @@ rules:
   # password, passwd or key (optionally plural), as a word of a snake_case
   # name: `(^|_)(secret|token|password|passwd|key)s?$`. Names ending in `_env`
   # (references to environment variables) never match. `idempotency_key` is
-  # an identifier, not a secret, and is the one exception.
+  # an identifier, not a secret, and is the one exception. The other exception
+  # is `TokenCreated.token`, the API token returned once by `createToken`
+  # (core ADR 0030 T8, T9): it is response-only, so it must be `readOnly`, not
+  # `writeOnly` (rules angelia-token-created-* below), and no other schema,
+  # response or example may have a `token` member (angelia-token-member-*).
   angelia-secrets-write-only:
     description: A secret-named property is writeOnly.
     severity: error
-    given: $.components.schemas..properties[?(@property.match(/^(?!idempotency_key$)(.*_)?(secret|token|password|passwd|key)s?$/))]
+    given: $.components.schemas[?(@property != 'TokenCreated')]..properties[?(@property.match(/^(?!idempotency_key$)(.*_)?(secret|token|password|passwd|key)s?$/))]
     then:
       field: writeOnly
       function: truthy
@@ -123,7 +127,7 @@ rules:
   angelia-no-secret-in-response-schema:
     description: No 2xx response schema has a secret-named property.
     severity: error
-    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].schema..properties
+    given: $.paths[*][?(@.operationId != 'createToken')].responses[?(@property.match(/^2/))].content[*].schema..properties
     then:
       field: '@key'
       function: pattern
@@ -133,7 +137,7 @@ rules:
   angelia-no-secret-in-response-example:
     description: No 2xx response example has a secret-named member.
     severity: error
-    given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].examples[*].value..[?(@property && @property.match && @property != 'idempotency_key' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
+    given: $.paths[*][?(@.operationId != 'createToken')].responses[?(@property.match(/^2/))].content[*].examples[*].value..[?(@property && @property.match && @property != 'idempotency_key' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
     then:
       function: undefined
 
@@ -199,5 +203,85 @@ rules:
     description: No 2xx response example has a value or value_base64 member.
     severity: error
     given: $.paths[*][*].responses[?(@property.match(/^2/))].content[*].examples[*].value..[?(@property === 'value' || @property === 'value_base64')]
+    then:
+      function: undefined
+
+  # API tokens (core ADR 0030, T8 and T9). The secret of a token is returned in
+  # exactly one place: the member `token` of the 201 response of createToken
+  # (TokenCreated). The two generic rules above skip createToken, so the rules
+  # below keep that exception to that one member.
+  angelia-token-created-member:
+    description: TokenCreated has the member token, and it is readOnly (it is returned once and never sent).
+    severity: error
+    given: $.components.schemas.TokenCreated.allOf[*].properties.token
+    then:
+      - field: readOnly
+        function: truthy
+      - field: pattern
+        function: truthy
+
+  angelia-token-created-only-response:
+    description: createToken returns TokenCreated in its 201 response and nothing else, and only that schema may have a token member.
+    severity: error
+    given: $.paths['/v1/tokens'].post.responses['201'].content['application/json'].schema
+    resolved: false
+    then:
+      field: $ref
+      function: pattern
+      functionOptions:
+        match: '^#/components/schemas/TokenCreated$'
+
+  angelia-token-created-no-other-secret:
+    description: The top level of the createToken response schema has no secret-named property other than the member token.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].schema.allOf[*].properties
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        notMatch: '^(?!idempotency_key$|token$)(.*_)?(secret|token|password|passwd|key)s?$'
+
+  angelia-token-created-no-nested-secret:
+    description: Nothing nested in the createToken response schema has a secret-named property, token included.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].schema.allOf[*].properties[*]..properties
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        notMatch: '^(?!idempotency_key$)(.*_)?(secret|token|password|passwd|key)s?$'
+
+  angelia-token-created-no-other-secret-example:
+    description: The createToken response examples have no secret-named member other than the top-level token.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].examples[*].value[?(@property && @property.match && @property !== 'idempotency_key' && @property !== 'token' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
+    then:
+      function: undefined
+
+  angelia-token-created-no-nested-secret-example:
+    description: Nothing nested in a createToken response example has a secret-named member, token included.
+    severity: error
+    given: $.paths[*][?(@.operationId == 'createToken')].responses[?(@property.match(/^2/))].content[*].examples[*].value[*]..[?(@property && @property.match && @property !== 'idempotency_key' && @property.match(/(^|_)(secret|token|password|passwd|key)s?$/))]
+    then:
+      function: undefined
+
+  angelia-token-member-schema:
+    description: No schema other than TokenCreated has a token member (a request body, a response, or a nested object).
+    severity: error
+    given: $.components.schemas[?(@property != 'TokenCreated')]..properties.token
+    then:
+      function: undefined
+
+  angelia-token-member-example:
+    description: No example other than TokenCreated has a token member.
+    severity: error
+    given: $.components.examples[?(@property != 'TokenCreated')].value..[?(@property === 'token')]
+    then:
+      function: undefined
+
+  angelia-token-member-inline-example:
+    description: No inline response or request example other than createToken's has a token member.
+    severity: error
+    given: $.paths[*][?(@.operationId != 'createToken')]..examples[*].value..[?(@property === 'token')]
     then:
       function: undefined
