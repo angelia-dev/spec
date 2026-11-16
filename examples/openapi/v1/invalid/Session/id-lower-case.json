@@ -1,0 +1,16 @@
+{
+  "id": "01jd0b6q1w4e7r9t2y5v8x0z3a",
+  "user": {
+    "provider": "github",
+    "subject": "139323",
+    "login": "mmornati",
+    "name": "Marco Mornati",
+    "avatar_url": "https://avatars.githubusercontent.com/u/139323?v=4"
+  },
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0",
+  "created_at": "2026-11-16T08:00:00.000Z",
+  "last_seen_at": "2026-11-16T09:40:00.000Z",
+  "expires_at": "2026-11-23T08:00:00.000Z",
+  "revoked_at": null,
+  "revoked_by": null
+}

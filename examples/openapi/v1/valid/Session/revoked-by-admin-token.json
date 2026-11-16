@@ -1,0 +1,16 @@
+{
+  "id": "01JD08F2K5M8P1R4T7W0Y3B6C9",
+  "user": {
+    "provider": "github",
+    "subject": "583231",
+    "login": "octocat",
+    "name": null,
+    "avatar_url": null
+  },
+  "user_agent": null,
+  "created_at": "2026-11-16T08:00:00.000Z",
+  "last_seen_at": "2026-11-16T09:40:00.000Z",
+  "expires_at": "2026-11-23T08:00:00.000Z",
+  "revoked_at": "2026-11-16T10:00:00.000Z",
+  "revoked_by": "01JCZ7P0N4D8E1B5XJ2Q6S3TGH"
+}

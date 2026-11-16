@@ -1,0 +1,14 @@
+{
+  "principal_id": "mmornati",
+  "name": "mmornati",
+  "scope": "write",
+  "kind": "session",
+  "role": "editor",
+  "user": {
+    "provider": "github",
+    "subject": "139323",
+    "login": "mmornati",
+    "name": "Marco Mornati",
+    "avatar_url": "https://avatars.githubusercontent.com/u/139323?v=4"
+  }
+}
