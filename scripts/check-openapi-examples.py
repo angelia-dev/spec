@@ -2,7 +2,8 @@
 """Check example bodies against the schemas of openapi/angelia.v1.yaml.
 
 scripts/validate-examples.sh covers the event schemas and scripts/check-mcp-tools.py the MCP
-tools; this covers the API schemas that carry a secret (API tokens, core ADR 0030).
+tools; this covers the API schemas that carry a secret (API tokens, core ADR 0030) and those of
+browser sessions (core ADR 0033).
 
 Layout: examples/openapi/v1/<valid|invalid>/<Schema>/<name>.json, where <Schema> is a key of
 components.schemas.
@@ -44,6 +45,9 @@ SCHEMAS = {
     "Token": ["Token"],
     "TokenCreated": ["TokenCreated"],
     "TokenPage": ["TokenPage"],
+    "Me": ["MeToken", "MeSession"],
+    "Session": [],
+    "SessionPage": ["SessionPage"],
 }
 
 errors = []

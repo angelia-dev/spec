@@ -1,0 +1,16 @@
+{
+  "id": "01JD0B6Q1W4E7R9T2Y5V8X0Z3A",
+  "user": {
+    "provider": "github",
+    "subject": "139323",
+    "login": "mmornati",
+    "name": "Marco Mornati",
+    "avatar_url": "https://avatars.githubusercontent.com/u/139323?v=4"
+  },
+  "user_agent": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "created_at": "2026-11-16T08:00:00.000Z",
+  "last_seen_at": "2026-11-16T09:40:00.000Z",
+  "expires_at": "2026-11-23T08:00:00.000Z",
+  "revoked_at": null,
+  "revoked_by": null
+}
