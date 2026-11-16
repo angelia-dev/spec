@@ -1,0 +1,12 @@
+{
+  "template": "{\"text\": \"{{.data.package}} {{.data.version}} was released\"}",
+  "event": {
+    "specversion": "1.0",
+    "type": "dev.angelia.release.published.v1",
+    "id": "01JBX2A7C8D9E0F1G2H3J4K5M6",
+    "data": {
+      "package": "requests",
+      "version": "2.33.0"
+    }
+  }
+}

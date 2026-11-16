@@ -1,0 +1,3 @@
+{
+  "template": "{\"text\": \"{{.data.package}} {{.data.version}} was released\"}"
+}

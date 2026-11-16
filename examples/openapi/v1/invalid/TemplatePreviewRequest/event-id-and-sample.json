@@ -1,0 +1,5 @@
+{
+  "template": "{\"text\": \"{{.data.package}} {{.data.version}} was released\"}",
+  "event_id": "01JBX2A7C8D9E0F1G2H3J4K5M6",
+  "sample": "full"
+}
