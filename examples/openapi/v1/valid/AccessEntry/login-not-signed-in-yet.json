@@ -1,0 +1,8 @@
+{
+  "provider": "github",
+  "kind": "user",
+  "login": "octo-viewer",
+  "subject": null,
+  "pinned": false,
+  "role": "viewer"
+}

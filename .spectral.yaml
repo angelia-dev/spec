@@ -96,10 +96,15 @@ rules:
         match: '^#/components/responses/'
 
   # Property names are snake_case, like the event schema and the watch file.
+  # JsonSchema is the one exception: it describes a JSON Schema document, whose
+  # keywords ($schema, additionalProperties, ...) are not ours to name. The rule
+  # reads the document unresolved, so a schema that references JsonSchema does
+  # not inline it; every referenced schema is a component checked on its own.
   angelia-property-snake-case:
     description: Schema property names are snake_case.
     severity: error
-    given: $.components.schemas..properties
+    given: $.components.schemas[?(@property != 'JsonSchema')]..properties
+    resolved: false
     then:
       field: '@key'
       function: pattern

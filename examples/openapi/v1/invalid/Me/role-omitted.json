@@ -3,5 +3,6 @@
   "name": "grafana",
   "scope": "read",
   "kind": "token",
-  "user": null
+  "user": null,
+  "session_id": null
 }
