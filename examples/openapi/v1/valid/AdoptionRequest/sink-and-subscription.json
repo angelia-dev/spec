@@ -1,0 +1,7 @@
+{
+  "objects": [
+    {"kind": "sink", "name": "ci-webhook"},
+    {"kind": "subscription", "name": "platform-ci"}
+  ],
+  "dry_run": true
+}

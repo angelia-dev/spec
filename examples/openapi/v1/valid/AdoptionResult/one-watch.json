@@ -1,0 +1,6 @@
+{
+  "dry_run": false,
+  "adopted": [
+    {"kind": "watch", "name": "pypi-requests", "id": "01JBX1WZ9Y8X7W6V5T4S3R2Q1P"}
+  ]
+}

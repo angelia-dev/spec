@@ -4,7 +4,7 @@
 scripts/validate-examples.sh covers the event schemas and scripts/check-mcp-tools.py the MCP
 tools; this covers the API schemas that carry a secret (API tokens, core ADR 0030), those of
 browser sessions (core ADR 0033) and those the admin UI added in spec 0.9.0 (the access list and
-the template preview, core #274).
+the template preview, core #274) and the adoption of watch-file resources (spec 0.10.0).
 
 Layout: examples/openapi/v1/<valid|invalid>/<Schema>/<name>.json, where <Schema> is a key of
 components.schemas.
@@ -53,6 +53,8 @@ SCHEMAS = {
     "AccessList": ["AccessList"],
     "TemplatePreviewRequest": ["TemplatePreviewSample", "TemplatePreviewStoredEvent"],
     "TemplatePreview": ["TemplatePreviewRendered", "TemplatePreviewFailed"],
+    "AdoptionRequest": ["AdoptionRequest"],
+    "AdoptionResult": ["AdoptionResult"],
 }
 
 errors = []
