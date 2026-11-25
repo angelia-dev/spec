@@ -1,0 +1,1 @@
+{"url": "mqtts://broker.example.net", "topic": "angelia/releases", "client_id_prefix": "angelia-release-bus"}
