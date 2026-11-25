@@ -1,1 +1,1 @@
-{"project": "platform/app", "ref": "main", "token_ref": "gitlab-trigger", "variables": {"RELEASE_URL": "{{ .Data.URLs.Release }}"}, "inputs": {"version": "{{ .Data.Version }}"}}
+{"project": "platform/app", "ref": "main", "token_ref": "gitlab-trigger", "variables": {"RELEASE_URL": "{{.data.urls.release}}"}, "inputs": {"version": "{{.data.version}}"}}

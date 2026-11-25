@@ -3965,11 +3965,11 @@ components:
       additionalProperties: false
       properties:
         project:
-          description: The target project as a full path (`group/subgroup/name`, any depth) or its numeric id. Sent URL-encoded as one path segment.
+          description: The target project as a full path (`group/subgroup/name`, 2 to 20 segments) or its numeric id. Sent URL-encoded as one path segment.
           type: string
           minLength: 1
-          maxLength: 255
-          pattern: '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$'
+          maxLength: 1024
+          pattern: '^([0-9]{1,18}|[A-Za-z0-9_][A-Za-z0-9_.-]{0,254}(/[A-Za-z0-9_][A-Za-z0-9_.-]{0,254}){1,19})$'
         ref:
           description: Branch or tag the pipeline runs on. A literal, not a template. 1 to 255 characters, no control characters.
           type: string

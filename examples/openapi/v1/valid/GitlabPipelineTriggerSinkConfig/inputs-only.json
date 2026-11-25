@@ -1,1 +1,1 @@
-{"project": "platform/app", "ref": "main", "token_ref": "gitlab-trigger", "inputs": {"package": "{{ .Data.Package }}", "version": "{{ .Data.Version }}"}, "timeout": "20s"}
+{"project": "platform/app", "ref": "main", "token_ref": "gitlab-trigger", "inputs": {"package": "{{.data.package}}", "version": "{{.data.version}}"}, "timeout": "20s"}

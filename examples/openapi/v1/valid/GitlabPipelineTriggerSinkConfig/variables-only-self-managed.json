@@ -1,1 +1,1 @@
-{"project": "ops/release-bot", "ref": "v1", "base_url": "https://git.example.com/gitlab", "token_env": "GITLAB_TRIGGER_TOKEN", "variables": {"RELEASE_VERSION": "{{ .Data.Version }}", "RELEASE_PACKAGE": "{{ .Data.Package }}"}}
+{"project": "ops/release-bot", "ref": "v1", "base_url": "https://git.example.com/gitlab", "token_env": "GITLAB_TRIGGER_TOKEN", "variables": {"RELEASE_VERSION": "{{.data.version}}", "RELEASE_PACKAGE": "{{.data.package}}"}}
