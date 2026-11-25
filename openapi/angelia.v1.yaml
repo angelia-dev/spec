@@ -3975,7 +3975,7 @@ components:
           type: string
           minLength: 1
           maxLength: 255
-          pattern: '^[^\u0000-\u001f\u007f]+$'
+          pattern: '^[^\x00-\x1F\x7F]+$'
         base_url:
           description: Base URL of the GitLab instance, `https://gitlab.example.com` or with a relative root (`https://example.com/gitlab`); a trailing `/api/v4` is accepted and ignored. No userinfo, query or fragment. `https` only; `http` is accepted for a host in the instance's `http.allow_http_hosts`, checked at every delivery, and `config check` then warns that the token is sent in cleartext. The token is sent only here.
           type: string
