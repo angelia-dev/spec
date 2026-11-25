@@ -70,7 +70,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `package`
 
 - **Type:** string. **Required, not null.**
-- Package name as the source normalised it; never blank (it contains at least one non-whitespace character). The form depends on the source kind: `requests` (pypi), `@angular/core` (npm), `serde` (crates), `cli/cli` (GitHub owner/repo), `group/subgroup/project` (GitLab path), `ghcr.io/org/image` (OCI), `github.com/gorilla/mux` (Go module path), `org.slf4j:slf4j-api` (Maven). The subscription filter's `package` glob matches it.
+- Package name as the source normalised it; never blank (it contains at least one non-whitespace character). The form depends on the source kind: `requests` (pypi), `@angular/core` (npm), `serde` (crates), `cli/cli` (GitHub owner/repo), `group/subgroup/project` (GitLab path), `ghcr.io/org/image` (OCI), `github.com/gorilla/mux` (Go module path), `org.slf4j:slf4j-api` (Maven), the watch's `name` coordinate (`http-json`, `http-regex`; for example `tool`, giving the subject `http-json:tool@2.1.0`). The subscription filter's `package` glob matches it.
 - Example: `"requests"`
 
 ### `version`

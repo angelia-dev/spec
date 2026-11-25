@@ -26,7 +26,7 @@ Maintainer decisions D8 to D13 of 2026-11-10 (core [angelia-dev/angelia#81](http
 | `list_watches` | `GET /v1/watches` | `read` | read-only, open world |
 | `latest_version` | `GET /v1/watches/{name}/versions?yanked=false`, plus `&prerelease=false` unless `include_prerelease` | `read` | read-only, open world |
 | `events_since` | `GET /v1/events` | `read` | read-only, open world |
-| `add_watch` | `GET /v1/watches/{name}`, then `PUT /v1/watches/{name}` (with `?dry_run=true` when the watch exists) | `write` | not destructive, idempotent, closed world |
+| `add_watch` | `GET /v1/watches/{name}`, then `PUT /v1/watches/{name}` (with `?dry_run=true` when the watch exists) | `write`; `admin` for a source of kind `http-json` or `http-regex` | not destructive, idempotent, closed world |
 | `ack_event` | `POST /v1/consumers/{name}/ack` | `write` | not destructive, idempotent, closed world |
 
 Every tool carries all four boolean hints, as the Go SDK emits them. The reads have `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: false` (the SDK always emits it; it means nothing for a read-only tool) and `openWorldHint: true`, because what they return comes from upstream registries. The writes have `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true` and `openWorldHint: false`: they change only the Angelia instance. Scopes are those of the REST operations ([docs/api.md, Auth](api.md#auth)); a token can list every tool, and a call above its scope is a tool error with `required_scope`.
