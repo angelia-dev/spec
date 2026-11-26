@@ -1,0 +1,1 @@
+{"command": "deploy-hook", "argv": ["/bin/sh", "-c", "id"]}

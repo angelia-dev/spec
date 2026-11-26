@@ -3,10 +3,10 @@
 
 scripts/validate-examples.sh covers the event schemas and scripts/check-mcp-tools.py the MCP
 tools; this covers the API schemas that carry a secret (API tokens, core ADR 0030), those of
-browser sessions (core ADR 0033) and those the admin UI added in spec 0.9.0 (the access list and
+browser sessions (core ADR 0033), those the admin UI added in spec 0.9.0 (the access list and
 the template preview, core #274), the adoption of watch-file resources (spec 0.10.0), the
-`gitlab-pipeline-trigger` sink configuration (spec 0.11.0) and the `mqtt` sink configuration
-(spec 0.13.0).
+`gitlab-pipeline-trigger` sink configuration (spec 0.11.0), the `mqtt` sink configuration
+(spec 0.13.0) and the exec sink's configuration (spec 0.14.0).
 
 Layout: examples/openapi/v1/<valid|invalid>/<Schema>/<name>.json, where <Schema> is a key of
 components.schemas.
@@ -59,6 +59,7 @@ SCHEMAS = {
     "AdoptionResult": ["AdoptionResult"],
     "GitlabPipelineTriggerSinkConfig": [],
     "MqttSinkConfig": [],
+    "ExecSinkConfig": [],
 }
 
 errors = []
