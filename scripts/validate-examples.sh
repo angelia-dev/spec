@@ -15,6 +15,8 @@
 #   - an example is not parseable JSON, or is not a .json file;
 #   - an example has no matching schema, or a schema is not valid JSON Schema;
 #   - no examples were found at all;
+#   - no valid envelope example has a type unknown to this spec, or the data
+#     of such an example validates against a data schema of this spec;
 #   - webhooks/v1/vectors.json does not validate against
 #     schemas/webhooks/v1.json, or a signature or expected result in it does
 #     not recompute (scripts/check-webhook-vectors.py).
@@ -105,7 +107,38 @@ check_group() {
 check_group valid pass
 check_group invalid fail
 
-# 4. The webhook test vectors must match their schema and recompute.
+# 4. The event-type set is open: a valid envelope example with a type that
+#    has no data schema in this spec (no then branch in the envelope) must have
+#    a data that fails every data schema the spec defines (schemas/<type>/v<major>.json
+#    other than envelopes and the webhook vectors' schema).
+release_types='dev.angelia.release.published.v1 dev.angelia.release.yanked.v1 dev.angelia.release.prerelease.v1'
+unknown=0
+while IFS= read -r -d '' example; do
+  type="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["type"])' "$example")"
+  if [[ " $release_types " == *" $type "* ]]; then
+    continue
+  fi
+  unknown=$((unknown + 1))
+  data="$(mktemp --suffix=.json)"
+  python3 -c 'import json, sys; json.dump(json.load(open(sys.argv[1], encoding="utf-8"))["data"], open(sys.argv[2], "w"))' "$example" "$data"
+  while IFS= read -r -d '' schema; do
+    checked=$((checked + 1))
+    if "$CHECK" --base-uri "file://$PWD/$schema" --schemafile "$schema" "$data" >"$log" 2>&1; then
+      fail "[unknown type] data of $example ($type) validates against $schema"
+    elif ! grep -qF "$VALIDATION_ERROR" "$log"; then
+      fail "[unknown type] data of $example failed against $schema for the wrong reason"
+      cat "$log"
+    else
+      echo "ok   [unknown type $type] data of $example fails $schema"
+    fi
+  done < <(find schemas -type f -name 'v[0-9]*.json' ! -path '*/envelope/*' ! -path 'schemas/webhooks/*' -print0)
+  rm -f "$data"
+done < <(find examples/valid -type f -path '*/envelope/*' -name '*.json' -print0)
+if [[ "$unknown" -eq 0 ]]; then
+  fail "no valid envelope example with a type unknown to this spec"
+fi
+
+# 5. The webhook test vectors must match their schema and recompute.
 vectors=webhooks/v1/vectors.json
 if [[ ! -f "$vectors" ]]; then
   fail "missing $vectors"

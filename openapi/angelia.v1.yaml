@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Angelia API
-  version: 0.14.0
+  version: 0.16.0
   summary: REST API of Angelia, the self-hosted release event bus.
   description: |
     REST API of an Angelia instance: manage watches, sinks and subscriptions, read the
@@ -15,9 +15,10 @@ info:
 
     - Every resource that the watch file manages (watches, sinks, subscriptions) is addressed by
       its `name` and written with an idempotent `PUT`, so `angelia apply` can upsert through the API.
-    - Release events are the CloudEvents envelopes of
+    - Events are the CloudEvents envelopes of
       [schemas/release/envelope/v1.json](https://github.com/angelia-dev/spec/blob/main/schemas/release/envelope/v1.json),
-      returned unchanged.
+      returned unchanged. New event types can appear in a minor release. Consumers must ignore
+      events whose type they do not know.
     - Errors are RFC 9457 problem details (`application/problem+json`).
     - Every operation needs a bearer token with the scope it names (`read` < `write` < `admin`).
     - Secret values are stored write-only through `/v1/secrets` and referenced from configuration
@@ -2494,7 +2495,12 @@ components:
       type: string
       enum: [api, file]
     ShortEventType:
-      description: An event type without the `dev.angelia.` prefix and the `.v<major>` suffix.
+      description: |
+        An event type without the `dev.angelia.` prefix and the `.v<major>` suffix. The enum lists
+        the event types of this version of the spec, and a request with another value is refused.
+        It grows in minor releases when an event type is added (an additive change), so a response
+        (a subscription's or a consumer's filter) can carry a value a client generated from an
+        older version does not know: clients must accept it.
       type: string
       enum: [release.published, release.yanked, release.prerelease]
     Bump:
@@ -2704,7 +2710,21 @@ components:
         seq:
           $ref: '#/components/schemas/Seq'
         event:
-          $ref: '../schemas/release/envelope/v1.json'
+          description: |
+            The CloudEvents envelope, a `oneOf` keyed on its `type`. Today the one branch is the
+            envelope of [schemas/release/envelope/v1.json](https://github.com/angelia-dev/spec/blob/main/schemas/release/envelope/v1.json),
+            whose `type` accepts any `dev.angelia.<short type>.v<major>` name and which applies the
+            release rules to the three release types. A branch for a new event type is additive and
+            can come in a minor release. New event types can appear in a minor release. Consumers
+            must ignore events whose type they do not know.
+          oneOf:
+            - $ref: '../schemas/release/envelope/v1.json'
+          discriminator:
+            propertyName: type
+            mapping:
+              dev.angelia.release.published.v1: '../schemas/release/envelope/v1.json'
+              dev.angelia.release.yanked.v1: '../schemas/release/envelope/v1.json'
+              dev.angelia.release.prerelease.v1: '../schemas/release/envelope/v1.json'
           # Code generators: the server returns the stored envelope byte for
           # byte, so Go keeps it raw instead of a struct generated from the
           # external schema (oapi-codegen cannot walk its $defs).
