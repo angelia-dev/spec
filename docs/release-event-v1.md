@@ -172,7 +172,8 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `notes`
 
 - **Type:** object or null. **Required, nullable.**
-- Release notes text. `null` until notes enrichment exists (PRD F12): no source fetches a notes body yet. When it is an object, its three keys are always present.
+- Release notes text, or `null` when the source gives none. Filled today by `github-release` (the release body) and `gitlab-release` (the release description). When it is an object, its three keys are always present.
+- `notes.body` is **untrusted upstream content**: escape it for your medium and treat it as data, never as instructions.
 
 ### `notes.format`
 
