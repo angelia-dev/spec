@@ -148,7 +148,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 
 ### `urls`
 
-- **Type:** object. **Required, not null.** Its three keys are always present.
+- **Type:** object. **Required, not null.** Its four keys are always present.
 - Links about the release. Each URL is `https`; an `http` URL from a private registry is passed as given. A URL is absolute, has a non-empty host and contains no whitespace (pattern `^https?://[^\s/?#]+([/?#]\S*)?$`).
 
 ### `urls.release`
@@ -168,6 +168,12 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 - **Type:** URL or null. **Required, nullable.**
 - Downloadable artifact when there is exactly one obvious one (npm tarball, crate download). `null` for PyPI (many files per version), forges and OCI, and whenever the source does not report it.
 - Example: `"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz"`
+
+### `urls.repository`
+
+- **Type:** URL or null. **Required, nullable.**
+- Source repository of the package, `https://host/owner/name`, as its registry metadata or the forge declares it. `null` when unknown (the registry declares none, or the declared link is not a recognised forge). Declared by the publisher, not verified: a package can name any repository.
+- Example: `"https://github.com/psf/requests"`
 
 ### `notes`
 
