@@ -108,7 +108,7 @@ check_group valid pass
 check_group invalid fail
 
 # 4. The event-type set is open: a valid envelope example with a type that
-#    has no data schema in this spec (no then branch in the envelope) must have
+#    has no data schema in this spec (no if/then entry in the envelope) must have
 #    a data that fails every data schema the spec defines (schemas/<type>/v<major>.json
 #    other than envelopes and the webhook vectors' schema).
 release_types='dev.angelia.release.published.v1 dev.angelia.release.yanked.v1 dev.angelia.release.prerelease.v1'
