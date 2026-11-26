@@ -12,6 +12,8 @@ Angelia emits three CloudEvents 1.0 types, in JSON structured mode, that share *
 
 Not events in v1 (logged only): a version yanked while held for cooldown, a version first seen yanked, un-yank, removal and return. Each could become an additive event type later.
 
+**New event types can appear in a minor release. Consumers must ignore events whose type they do not know.** See [Event types are an open set](#event-types-are-an-open-set).
+
 Schemas:
 
 - `data`: [`schemas/release/v1.json`](../schemas/release/v1.json), `$id` `https://github.com/angelia-dev/spec/schemas/release/v1.json`.
@@ -24,7 +26,7 @@ The `$id` URLs are identifiers, not promised to be fetchable. Examples: [`exampl
 - Field names are snake_case.
 - **Every documented field is always present.** A field with no value is `null`, never omitted. Fields added later in a minor version are optional and may be absent in older events.
 - Timestamps are RFC 3339 in UTC with a `Z` suffix and at most millisecond precision, for example `2026-10-30T17:00:02.512Z`.
-- **Open sets.** The values of `source`, `scheme` and `notes.format` are documented lists, not closed enums: they match `^[a-z0-9][a-z0-9-]{0,62}$`, and consumers must accept values they do not know. `bump` and the event `type` are closed enums.
+- **Open sets.** The values of `source`, `scheme` and `notes.format` are documented lists, not closed enums: they match `^[a-z0-9][a-z0-9-]{0,62}$`, and consumers must accept values they do not know. The event `type` is an open set too (see [below](#event-types-are-an-open-set)). `bump` is a closed enum.
 - **Open objects, tolerant consumers.** Producers emit only the documented fields in `data` and its nested objects, and only the documented envelope attributes (no extension attributes in v1). Consumers **must ignore** fields and extension attributes they do not know: the `data` schema and its nested objects (`urls`, `notes`, `watch`) accept unknown properties, and the envelope schema accepts any attribute whose name is a valid CloudEvents extension name (`^[a-z0-9]{1,20}$`, for example `traceparent` added by a tracing intermediary). Other unknown envelope names are rejected. Adding a new optional field or attribute is therefore a **minor** change.
 
 ## Envelope attributes
@@ -32,18 +34,28 @@ The `$id` URLs are identifiers, not promised to be fetchable. Examples: [`exampl
 | Attribute | Required | Value |
 | --- | --- | --- |
 | `specversion` | yes | `"1.0"`. |
-| `type` | yes | One of the three types above. The short type is `type` without the `dev.angelia.` prefix and the `.v<major>` suffix; subscription filters use it. |
+| `type` | yes | `dev.angelia.<short type>.v<major>`, pattern `^dev\.angelia\.[a-z0-9]+(\.[a-z0-9]+)*\.v[0-9]+$`; Angelia emits one of the three types above today. The short type is `type` without the `dev.angelia.` prefix and the `.v<major>` suffix; subscription filters use it. |
 | `source` | yes | `angelia://<instance>/watches/<watch_id>`, for example `angelia://angelia/watches/01JBX1Z3M4N5P6Q7R8S9T0V1W2`. `<instance>` is the instance name from the instance configuration (pattern `^[a-z0-9][a-z0-9.-]{0,62}$`, default `angelia`); `<watch_id>` equals `data.watch.id`. Two watches on one package produce two events with different `source` values. |
 | `id` | yes | ULID: 26 characters, Crockford base32, upper case. Generated once when the event is written. Every delivery attempt, retry and replay carries the same `id`: deduplicate on it (delivery is at-least-once). `source` + `id` is globally unique. The `id` is not derived from content: to get one notification per release across two watches, deduplicate on `data.purl` + `type` or `subject` + `type`. Example: `01JBX2A7C8D9E0F1G2H3J4K5M6`. |
-| `subject` | yes | `<source kind>:<package>@<version>` with the raw version, for example `pypi:requests@2.33.0`, `npm:@angular/core@17.3.0`, `github-release:cli/cli@v2.62.0`. |
+| `subject` | yes | For the release types, `<source kind>:<package>@<version>` with the raw version, for example `pypi:requests@2.33.0`, `npm:@angular/core@17.3.0`, `github-release:cli/cli@v2.62.0`. |
 | `time` | yes | When the event was **emitted** (the end of the check that emitted it). With a cooldown this is later than `data.detected_at`. Same format as the `data` timestamps, for example `2026-10-30T17:00:02.512Z`. |
 | `datacontenttype` | yes | `"application/json"`. |
-| `dataschema` | yes | `"https://github.com/angelia-dev/spec/schemas/release/v1.json"`. Once the spec repository has release tags it will name a tagged, versioned URL instead. |
+| `dataschema` | yes | For the release types, `"https://github.com/angelia-dev/spec/schemas/release/v1.json"`. Once the spec repository has release tags it will name a tagged, versioned URL instead. |
 | `data` | yes | The payload described below. |
 
 v1 defines **no extension attributes**, and Angelia emits none. Consumers must ignore extension attributes they find anyway (a broker or tracing intermediary may add `traceparent`, for example); the envelope schema allows any name matching `^[a-z0-9]{1,20}$`. `partitionkey` (the CloudEvents Partitioning extension) is planned with the NATS, MQTT and Kafka sinks, as an additive change.
 
 The per-delivery `idempotency-key` and the Standard Webhooks `webhook-id` are delivery headers, not CloudEvents attributes.
+
+## Event types are an open set
+
+New event types can appear in a minor release. Consumers must ignore events whose type they do not know.
+
+- The envelope schema accepts any `type` matching `^dev\.angelia\.[a-z0-9]+(\.[a-z0-9]+)*\.v[0-9]+$`. Adding an event type is an **additive** change, released in a minor version of the spec; it is not a new `.v<major>` of the existing types.
+- `subject`, `dataschema` and `data` depend on the type. For the three release types the envelope schema keeps their rules (one `allOf` `if`/`then` entry per type): `subject` is `<source kind>:<package>@<version>` and `dataschema` is the `$id` of [`schemas/release/v1.json`](../schemas/release/v1.json), which `data` must validate against (an entry keyed on `dataschema`, so the data schema is referenced once). For a type the spec does not define, `subject` is a non-empty string whose form that type's documentation gives, `dataschema` is the URI of that type's `data` schema, and `data` is not checked by the envelope schema. Example: [`unknown-type-future.json`](../examples/valid/release/envelope/v1/unknown-type-future.json), a made-up type whose `data` validates against no `data` schema of this spec.
+- "Ignore" means: do not fail, do not retry, and do not treat the event as a release. A consumer that switches on `type` needs a default branch that skips the event (and acknowledges it, when it reads through a consumer cursor).
+- [`schemas/release/envelope/v1.json`](../schemas/release/envelope/v1.json) is the single v1 envelope of every event type, and the REST API's `EventRecord.event` references it. A new type adds `if`/`then` entries to it (its `subject` and `dataschema` rules keyed on its `type`, its `data` schema keyed on its `dataschema`). They only narrow events of a type nobody emitted before, so the change is additive. The type may also publish its own strict envelope schema; that schema is not an alternative of `EventRecord.event`.
+- What a new type contains, when it is emitted and how subscriptions route it are specified with that type, in its own docs page and schemas.
 
 ## Rules that depend on the type
 
