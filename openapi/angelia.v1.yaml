@@ -2711,20 +2711,16 @@ components:
           $ref: '#/components/schemas/Seq'
         event:
           description: |
-            The CloudEvents envelope, a `oneOf` keyed on its `type`. Today the one branch is the
-            envelope of [schemas/release/envelope/v1.json](https://github.com/angelia-dev/spec/blob/main/schemas/release/envelope/v1.json),
+            The CloudEvents envelope, a `oneOf` keyed on its `type`: each branch is the envelope
+            schema of a family of event types and applies its rules to the types it names. Today the
+            one branch is [schemas/release/envelope/v1.json](https://github.com/angelia-dev/spec/blob/main/schemas/release/envelope/v1.json),
             whose `type` accepts any `dev.angelia.<short type>.v<major>` name and which applies the
-            release rules to the three release types. A branch for a new event type is additive and
-            can come in a minor release. New event types can appear in a minor release. Consumers
-            must ignore events whose type they do not know.
+            release rules to the three release types. Further branches, for new event types, are
+            additive and come in minor releases. New event types can appear in a minor release.
+            Consumers must ignore events whose type they do not know. (No `discriminator` keyword:
+            generators turn its mapping into a closed list of types.)
           oneOf:
             - $ref: '../schemas/release/envelope/v1.json'
-          discriminator:
-            propertyName: type
-            mapping:
-              dev.angelia.release.published.v1: '../schemas/release/envelope/v1.json'
-              dev.angelia.release.yanked.v1: '../schemas/release/envelope/v1.json'
-              dev.angelia.release.prerelease.v1: '../schemas/release/envelope/v1.json'
           # Code generators: the server returns the stored envelope byte for
           # byte, so Go keeps it raw instead of a struct generated from the
           # external schema (oapi-codegen cannot walk its $defs).
