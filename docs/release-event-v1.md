@@ -95,7 +95,7 @@ A `release.yanked` event repeats the classification of the event the watch emitt
 ### `scheme`
 
 - **Type:** string, open set. **Required, not null.**
-- Version scheme that classified the version. Known values: `semver`, `pep440`, `calver`, `lexical`; `maven` later.
+- Version scheme that classified the version. Known values: `semver`, `pep440`, `maven`, `calver`, `lexical`.
 - Example: `"pep440"`
 
 ### `bump`
