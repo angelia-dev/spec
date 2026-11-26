@@ -1,0 +1,1 @@
+{"url": "mqtt://mosquitto.lan:1883", "topic": "angelia/releases", "qos": 0, "username": "angelia", "password_env": "MQTT_PASSWORD"}
